@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+python-dotenv
+pydantic
+pydantic-settings
+boto3
+pandas
+apscheduler
+python-multipart
+email-validator
+google-auth-oauthlib
+google-auth-httplib2
+google-api-python-client
+streamlit
+requests
