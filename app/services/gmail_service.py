@@ -64,7 +64,7 @@ def exchange_code(code: str):
 import re
 from email.mime.multipart import MIMEMultipart
 
-def send_email(to_email: str, subject: str, body: str, refresh_token: str):
+def send_email(to_email: str, subject: str, body: str, refresh_token: str, signature_html: str = None):
     client_id = os.getenv("GOOGLE_CLIENT_ID")
     client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
     
@@ -79,16 +79,21 @@ def send_email(to_email: str, subject: str, body: str, refresh_token: str):
     
     service = build("gmail", "v1", credentials=creds)
     
+    # Append signature if provided
+    full_body = body
+    if signature_html:
+        full_body = f"{body}<br><br>{signature_html}"
+    
     # Using MIMEMultipart alternative helps prevent spam classification
     message = MIMEMultipart('alternative')
     message["to"] = to_email
     message["subject"] = subject
     
     # Strip basic HTML to create a plain text version
-    plain_text = re.sub(r'<[^>]+>', '', body)
+    plain_text = re.sub(r'<[^>]+>', '', full_body)
     
     part1 = MIMEText(plain_text, "plain")
-    part2 = MIMEText(body, "html")
+    part2 = MIMEText(full_body, "html")
     
     message.attach(part1)
     message.attach(part2)

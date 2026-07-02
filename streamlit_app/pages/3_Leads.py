@@ -22,7 +22,9 @@ if uploaded_file is not None:
             if "error" in result:
                 st.error(f"Upload failed: {result['error']}")
             else:
-                st.success(f"Successfully uploaded {result.get('count', 0)} leads!")
+                num = result.get('num_leads', 0)
+                name = result.get('lead_name', 'Unknown')
+                st.success(f"Successfully uploaded {num} leads into list '{name}'!")
 
 st.markdown("---")
 

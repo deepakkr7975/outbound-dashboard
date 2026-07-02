@@ -1,26 +1,28 @@
 import streamlit as st
 
 st.set_page_config(
-    page_title="Email Outreach MVP",
+    page_title="Email Automation Platform",
     page_icon="📧",
     layout="wide",
 )
 
-st.title("Welcome to Email Outreach MVP 📧")
+st.title("Welcome to the Email Automation Platform 🚀")
 
 st.markdown("""
-### Simple, Efficient, and Effective Email Automation
+### Powerful, Scalable Email Outreach
 
 Use the sidebar on the left to navigate through the platform:
 - **Dashboard**: View high-level metrics of your outreach operations.
-- **Email Accounts**: Connect and manage your Gmail sender accounts.
+- **Sender Emails**: Connect and manage your Gmail sender accounts, signatures, and daily limits.
 - **Leads**: Upload CSVs and view your prospective contacts.
-- **Bulk Schedule**: Compose messages and schedule them for automatic delivery.
-- **Scheduled Emails**: Track the status of emails waiting in the queue or already sent.
+- **Audience**: Group your leads into targeted audiences.
+- **Sequences**: Build multi-step email sequences with A/B subject variants and automated delays.
+- **Campaigns**: Launch campaigns that automatically distribute emails across your sender pool and follow up over time.
+- **Campaign Monitor**: Track real-time progress, view analytics, and inspect detailed email logs for your running campaigns.
 
 ---
 
-> **Note**: This is the MVP frontend built with Streamlit, talking seamlessly to our FastAPI backend and AWS infrastructure.
+> **Note**: This frontend is built with Streamlit, talking seamlessly to our FastAPI backend and AWS DynamoDB infrastructure.
 """)
 
 st.info("👈 Select a page from the sidebar to get started.")

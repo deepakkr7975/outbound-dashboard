@@ -4,6 +4,7 @@ import logging
 from app.repositories import dynamodb_repo
 from app.services.gmail_service import send_email
 from app.services.account_selection_service import AccountSelectionService
+from app.utils.template import render_template
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -53,15 +54,21 @@ def process_scheduled_emails():
             if not refresh_token:
                 raise Exception(f"Selected account {selected_account.get('email')} has no refresh token.")
             
-            # Get lead email address
+            # Get lead data — used both for the recipient address and template rendering
             lead_dict = dynamodb_repo.get_item("leads", {"id": lead_id})
             if not lead_dict:
                 raise Exception("Lead not found")
-                
+
             to_email = lead_dict.get("email")
-            
+
+            # Render mail-merge variables using the FULL lead dict.
+            # Any {{placeholder}} that matches a lead field is replaced;
+            # unknown placeholders (e.g. {{phone}} when absent) are left unchanged.
+            rendered_subject = render_template(subject, lead_dict)
+            rendered_body = render_template(body, lead_dict)
+
             # Send Email
-            send_email(to_email, subject, body, refresh_token)
+            send_email(to_email, rendered_subject, rendered_body, refresh_token)
             
             # Update scheduled email status
             dynamodb_repo.update_item(
@@ -129,13 +136,26 @@ def reset_daily_counters():
     except Exception as e:
         logger.error(f"Failed to reset daily counters: {e}")
 
+def process_campaign_emails():
+    """
+    Thin scheduler job for campaign-driven emails.
+    All business logic lives in CampaignService.
+    """
+    logger.info("Checking for due campaign emails...")
+    try:
+        from app.services.campaign_service import CampaignService
+        CampaignService.process_due_campaign_emails()
+    except Exception as e:
+        logger.error(f"Error processing campaign emails: {e}")
+
 def start_scheduler():
     scheduler = BackgroundScheduler()
-    # Check every minute
+    # Legacy: check for directly scheduled emails every minute
     scheduler.add_job(process_scheduled_emails, 'interval', minutes=1)
+    # New: campaign-driven email processing every minute
+    scheduler.add_job(process_campaign_emails, 'interval', minutes=1)
     # Reset daily limit counters at midnight
     scheduler.add_job(reset_daily_counters, 'cron', hour=0, minute=0)
     scheduler.start()
-    logger.info("Scheduler started.")
+    logger.info("Scheduler started (legacy + campaign processing).")
     return scheduler
-

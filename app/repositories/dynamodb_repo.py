@@ -42,6 +42,15 @@ def batch_write_items(table_name: str, items: List[Dict[str, Any]]):
         for item in items:
             batch.put_item(Item=item)
 
+def delete_item(table_name: str, key: Dict[str, Any]):
+    table = get_table(f"{table_name.upper()}_TABLE", table_name)
+    table.delete_item(Key=key)
+
+def batch_delete_items(table_name: str, keys: List[Dict[str, Any]]):
+    table = get_table(f"{table_name.upper()}_TABLE", table_name)
+    with table.batch_writer() as batch:
+        for key in keys:
+            batch.delete_item(Key=key)
 def query_gsi(table_name: str, index_name: str, key_condition_expression: str, expression_values: Dict[str, Any], expression_names: Dict[str, str] = None) -> List[Dict[str, Any]]:
     table = get_table(f"{table_name.upper()}_TABLE", table_name)
     kwargs = {

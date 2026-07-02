@@ -27,6 +27,11 @@ def init_tables():
     leads_table = os.getenv("LEADS_TABLE", "leads")
     scheduled_emails_table = os.getenv("SCHEDULED_EMAILS_TABLE", "scheduled_emails")
     email_logs_table = os.getenv("EMAIL_LOGS_TABLE", "email_logs")
+    audiences_table = os.getenv("AUDIENCES_TABLE", "audiences")
+    sequences_table = os.getenv("SEQUENCES_TABLE", "sequences")
+    sequence_steps_table = os.getenv("SEQUENCE_STEPS_TABLE", "sequence_steps")
+    campaigns_table = os.getenv("CAMPAIGNS_TABLE", "campaigns")
+    campaign_emails_table = os.getenv("CAMPAIGN_EMAILS_TABLE", "campaign_emails")
 
     # 1. users
     create_table_if_not_exists(
@@ -49,7 +54,7 @@ def init_tables():
         [{"AttributeName": "id", "AttributeType": "S"}]
     )
 
-    # 4. scheduled_emails (with GSI for polling)
+    # 4. scheduled_emails (legacy — with GSI for polling)
     create_table_if_not_exists(
         scheduled_emails_table,
         [{"AttributeName": "id", "KeyType": "HASH"}],
@@ -75,6 +80,70 @@ def init_tables():
         email_logs_table,
         [{"AttributeName": "email_id", "KeyType": "HASH"}],
         [{"AttributeName": "email_id", "AttributeType": "S"}]
+    )
+
+    # 6. audiences
+    create_table_if_not_exists(
+        audiences_table,
+        [{"AttributeName": "id", "KeyType": "HASH"}],
+        [{"AttributeName": "id", "AttributeType": "S"}]
+    )
+
+    # 7. sequences
+    create_table_if_not_exists(
+        sequences_table,
+        [{"AttributeName": "sequence_id", "KeyType": "HASH"}],
+        [{"AttributeName": "sequence_id", "AttributeType": "S"}]
+    )
+
+    # 9. campaigns (with GSI for scheduler to poll by status + schedule_at)
+    create_table_if_not_exists(
+        campaigns_table,
+        [{"AttributeName": "id", "KeyType": "HASH"}],
+        [
+            {"AttributeName": "id", "AttributeType": "S"},
+            {"AttributeName": "status", "AttributeType": "S"},
+            {"AttributeName": "schedule_at", "AttributeType": "S"},
+        ],
+        global_secondary_indexes=[
+            {
+                "IndexName": "status-schedule_at-index",
+                "KeySchema": [
+                    {"AttributeName": "status", "KeyType": "HASH"},
+                    {"AttributeName": "schedule_at", "KeyType": "RANGE"}
+                ],
+                "Projection": {"ProjectionType": "ALL"}
+            }
+        ]
+    )
+
+    # 10. campaign_emails (with GSIs for querying by campaign and for scheduler polling)
+    create_table_if_not_exists(
+        campaign_emails_table,
+        [{"AttributeName": "id", "KeyType": "HASH"}],
+        [
+            {"AttributeName": "id", "AttributeType": "S"},
+            {"AttributeName": "campaign_id", "AttributeType": "S"},
+            {"AttributeName": "status", "AttributeType": "S"},
+            {"AttributeName": "scheduled_at", "AttributeType": "S"},
+        ],
+        global_secondary_indexes=[
+            {
+                "IndexName": "campaign_id-index",
+                "KeySchema": [
+                    {"AttributeName": "campaign_id", "KeyType": "HASH"}
+                ],
+                "Projection": {"ProjectionType": "ALL"}
+            },
+            {
+                "IndexName": "status-scheduled_at-index",
+                "KeySchema": [
+                    {"AttributeName": "status", "KeyType": "HASH"},
+                    {"AttributeName": "scheduled_at", "KeyType": "RANGE"}
+                ],
+                "Projection": {"ProjectionType": "ALL"}
+            }
+        ]
     )
 
 

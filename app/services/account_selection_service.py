@@ -30,3 +30,21 @@ class AccountSelectionService:
             
         available_accounts.sort(key=get_sort_key)
         return available_accounts[0]
+
+    @staticmethod
+    def select_from_pool(
+        sender_email_ids: List[str],
+        all_accounts: List[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Filter accounts to only those in the campaign's sender pool,
+        then apply LRU selection.
+        
+        Future: this method will accept a sender_pool_id instead of
+        a list of IDs, and look up the pool's accounts.
+        """
+        pool_accounts = [
+            acc for acc in all_accounts
+            if acc.get("id") in sender_email_ids
+        ]
+        return AccountSelectionService.select_account(pool_accounts)
