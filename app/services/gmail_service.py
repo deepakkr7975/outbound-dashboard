@@ -100,7 +100,8 @@ def send_email(to_email: str, subject: str, body: str, refresh_token: str, signa
     
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
     
-    service.users().messages().send(
+    result = service.users().messages().send(
         userId="me",
         body={"raw": raw}
     ).execute()
+    return result.get("id")

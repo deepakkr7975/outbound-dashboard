@@ -38,7 +38,7 @@ def clear_table(table_name):
 if __name__ == "__main__":
     tables = [
         "leads", "scheduled_emails", "email_accounts", "sequences", 
-        "sequence_steps", "campaigns", "campaign_emails", "audiences", "email_logs"
+        "sequence_steps", "campaigns", "email_transactions", "lead_lists", "email_logs"
     ]
     for table in tables:
         clear_table(os.getenv(f"{table.upper()}_TABLE", table))

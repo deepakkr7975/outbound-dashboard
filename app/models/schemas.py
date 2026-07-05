@@ -22,10 +22,18 @@ class CampaignStatus(str, Enum):
     CANCELLED = "cancelled"
     FAILED = "failed"
 
-class CampaignEmailStatus(str, Enum):
-    PENDING = "pending"
+class EmailTransactionStatus(str, Enum):
+    QUEUED = "queued"
+    SENDING = "sending"      # claimed by a scheduler cycle, dispatch in flight
     SENT = "sent"
+    DELIVERED = "delivered"
+    OPENED = "opened"
+    CLICKED = "clicked"
+    REPLIED = "replied"
+    BOUNCED = "bounced"
     FAILED = "failed"
+    CANCELLED = "cancelled"
+    UNSUBSCRIBED = "unsubscribed"
 
 
 # ── Existing Entities ────────────────────────────────────────────────────────
@@ -71,9 +79,10 @@ class Lead(BaseModel):
     name: str
     email: EmailStr
     company: str
+    tags: List[str] = Field(default_factory=list)
     created_at: str = Field(default_factory=current_time_iso)
 
-# Scheduled Emails (legacy — kept for backward compatibility)
+# Scheduled Emails (direct /emails/* scheduling flow, separate from campaigns)
 class ScheduledEmail(BaseModel):
     id: str = Field(default_factory=generate_uuid)
     lead_id: str
@@ -91,7 +100,10 @@ class Audience(BaseModel):
     id: str = Field(default_factory=generate_uuid)
     name: str
     description: Optional[str] = None
-    lead_ids: List[str] = Field(default_factory=list)  # references to leads table
+    file_name: Optional[str] = None
+    tags: List[str] = Field(default_factory=list)
+    lead_ids: List[str] = Field(default_factory=list)
+    num_leads: int = 0
     created_at: str = Field(default_factory=current_time_iso)
     updated_at: str = Field(default_factory=current_time_iso)
 
@@ -131,22 +143,45 @@ class Campaign(BaseModel):
     created_at: str = Field(default_factory=current_time_iso)
     updated_at: str = Field(default_factory=current_time_iso)
 
-class CampaignEmail(BaseModel):
-    id: str = Field(default_factory=generate_uuid)
+class EmailTransaction(BaseModel):
+    PK: str                              # CAMPAIGN#{campaign_id}
+    SK: str                              # MSG#{lead_id}#{step_order}
+    transaction_id: str                  # ULID
     campaign_id: str
-    lead_id: str
-    step_order: int                      # Replacing sequence_step_id
-    selected_variant: str = "a"          # "a" or "b"
-    sender_email_id: Optional[str] = None  # assigned at send time by sender selection
-    status: str = CampaignEmailStatus.PENDING
-    scheduled_at: str                    # calculated from campaign.schedule_at + cumulative separation_days
-    sent_at: Optional[str] = None
+    sequence_id: str
+    step_order: int
+    lead_id: str                         # internal Lead ID
+    sender_email_id: Optional[str] = None
+    audience_id: Optional[str] = None
+    variant: str = "a"
+    
+    subject_line: Optional[str] = None
+    template_version: Optional[str] = None
+    
+    status: str = EmailTransactionStatus.QUEUED
+    
     created_at: str = Field(default_factory=current_time_iso)
+    scheduled_for: str                   # derived from wait_days
+    sent_at: Optional[str] = None
+    delivered_at: Optional[str] = None
+    opened_at: Optional[str] = None
+    clicked_at: Optional[str] = None
+    replied_at: Optional[str] = None
+    bounced_at: Optional[str] = None
+    failed_at: Optional[str] = None
+    
+    open_count: int = 0
+    click_count: int = 0
+    
+    provider: Optional[str] = None
+    provider_message_id: Optional[str] = None
+    bounce_type: Optional[str] = None
+    error_message: Optional[str] = None
 
 
 # ── Request/Response Schemas ─────────────────────────────────────────────────
 
-# Legacy request schemas (kept for backward compatibility)
+# Direct-scheduling request schemas (/emails/* endpoints)
 class ConnectEmailRequest(BaseModel):
     email: EmailStr
 
@@ -205,18 +240,10 @@ class UpdateEmailAccountRequest(BaseModel):
     domain_name: Optional[str] = None
 
 # Audience
-class CreateAudienceRequest(BaseModel):
-    name: str
-    description: Optional[str] = None
-    lead_ids: List[str] = Field(default_factory=list)
-
 class UpdateAudienceRequest(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
-    lead_ids: Optional[List[str]] = None  # if provided, replaces the full list
-
-class RemoveMembersRequest(BaseModel):
-    lead_ids: List[str]
+    tags: Optional[List[str]] = None
 
 # Sequence
 class CreateSequenceRequest(BaseModel):
@@ -249,3 +276,12 @@ class UpdateCampaignRequest(BaseModel):
     sequence_id: Optional[str] = None
     audience_id: Optional[str] = None
     schedule_at: Optional[datetime] = None
+
+# Transaction
+class UpdateTransactionRequest(BaseModel):
+    status: EmailTransactionStatus
+    provider: Optional[str] = None
+    provider_message_id: Optional[str] = None
+    sender_email_id: Optional[str] = None
+    bounce_type: Optional[str] = None
+    error_message: Optional[str] = None

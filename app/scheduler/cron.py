@@ -1,9 +1,11 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from datetime import datetime
 import logging
+import os
 from app.repositories import dynamodb_repo
 from app.services.gmail_service import send_email
 from app.services.account_selection_service import AccountSelectionService
+from app.services.tracking_service import instrument_html
 from app.utils.template import render_template
 
 logging.basicConfig(level=logging.INFO)
@@ -67,15 +69,28 @@ def process_scheduled_emails():
             rendered_subject = render_template(subject, lead_dict)
             rendered_body = render_template(body, lead_dict)
 
+            # Open/click tracking: rewrite links + append pixel (token s-{id})
+            base_url = os.getenv("APP_BASE_URL", "").rstrip("/")
+            tracked_urls = []
+            if base_url:
+                rendered_body, tracked_urls = instrument_html(
+                    rendered_body, f"s-{email_id}", base_url
+                )
+
             # Send Email
             send_email(to_email, rendered_subject, rendered_body, refresh_token)
-            
-            # Update scheduled email status
+
+            # Update scheduled email status (+ tracking metadata; sent_at
+            # feeds the too-fast-open bot heuristic)
             dynamodb_repo.update_item(
                 "scheduled_emails",
                 {"id": email_id},
-                "SET #st = :sent",
-                {":sent": "sent"},
+                "SET #st = :sent, sent_at = :sent_at, tracked_urls = :urls",
+                {
+                    ":sent": "sent",
+                    ":sent_at": datetime.utcnow().isoformat() + "Z",
+                    ":urls": tracked_urls
+                },
                 {"#st": "status"}
             )
             
@@ -136,26 +151,31 @@ def reset_daily_counters():
     except Exception as e:
         logger.error(f"Failed to reset daily counters: {e}")
 
-def process_campaign_emails():
+def process_email_transactions():
     """
-    Thin scheduler job for campaign-driven emails.
+    Thin scheduler job for campaign-driven transactions.
     All business logic lives in CampaignService.
     """
-    logger.info("Checking for due campaign emails...")
+    logger.info("Checking for due email transactions...")
     try:
         from app.services.campaign_service import CampaignService
-        CampaignService.process_due_campaign_emails()
+        CampaignService.process_due_transactions()
     except Exception as e:
-        logger.error(f"Error processing campaign emails: {e}")
+        logger.error(f"Error processing email transactions: {e}")
 
 def start_scheduler():
     scheduler = BackgroundScheduler()
-    # Legacy: check for directly scheduled emails every minute
-    scheduler.add_job(process_scheduled_emails, 'interval', minutes=1)
-    # New: campaign-driven email processing every minute
-    scheduler.add_job(process_campaign_emails, 'interval', minutes=1)
+    # Direct-scheduling poller for the /emails/* endpoints (scheduled_emails
+    # table). Runs alongside the campaign engine; set ENABLE_LEGACY_SCHEDULER=false to disable.
+    legacy_enabled = os.getenv("ENABLE_LEGACY_SCHEDULER", "true").lower() in ("1", "true", "yes")
+    if legacy_enabled:
+        scheduler.add_job(process_scheduled_emails, 'interval', minutes=1)
+    # Campaign-driven email processing every minute
+    scheduler.add_job(process_email_transactions, 'interval', minutes=1)
     # Reset daily limit counters at midnight
     scheduler.add_job(reset_daily_counters, 'cron', hour=0, minute=0)
     scheduler.start()
-    logger.info("Scheduler started (legacy + campaign processing).")
+    logger.info(
+        f"Scheduler started (campaign processing{' + legacy scheduled_emails' if legacy_enabled else ''})."
+    )
     return scheduler

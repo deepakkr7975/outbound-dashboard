@@ -1,6 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, ANY
 from datetime import datetime
 from app.main import app
 from app.services.account_selection_service import AccountSelectionService
@@ -137,6 +137,7 @@ def test_update_active(mock_repo):
 # 3. Integration/Mock Tests for Scheduler & Log Logic
 # -------------------------------------------------------------
 
+@patch.dict("os.environ", {"APP_BASE_URL": ""})  # disable tracking instrumentation for a deterministic body
 @patch("app.scheduler.cron.dynamodb_repo")
 @patch("app.scheduler.cron.send_email")
 def test_scheduler_success(mock_send_email, mock_repo):
@@ -156,12 +157,12 @@ def test_scheduler_success(mock_send_email, mock_repo):
     # Check that send_email was called with the correct refresh token
     mock_send_email.assert_called_once_with("lead@test.com", "Hello", "Body", "token1")
     
-    # Check that scheduled_emails was updated to "sent"
+    # Check that scheduled_emails was updated to "sent" (with tracking metadata)
     mock_repo.update_item.assert_any_call(
         "scheduled_emails",
         {"id": "email1"},
-        "SET #st = :sent",
-        {":sent": "sent"},
+        "SET #st = :sent, sent_at = :sent_at, tracked_urls = :urls",
+        {":sent": "sent", ":sent_at": ANY, ":urls": []},
         {"#st": "status"}
     )
     

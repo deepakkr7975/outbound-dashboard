@@ -10,16 +10,21 @@ Handles:
 """
 
 import logging
+import os
 import random
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Tuple
+import ulid
 
 from app.models.schemas import (
-    CampaignEmail, CampaignStatus, CampaignEmailStatus, current_time_iso
+    CampaignStatus, EmailTransaction, 
+    EmailTransactionStatus, current_time_iso
 )
 from app.repositories import dynamodb_repo
 from app.services.account_selection_service import AccountSelectionService
+from app.services.transaction_service import TransactionService
 from app.services.gmail_service import send_email
+from app.services.tracking_service import instrument_html
 from app.utils.template import render_template
 
 logger = logging.getLogger(__name__)
@@ -42,21 +47,21 @@ class CampaignService:
         steps = CampaignService._get_ordered_steps(campaign_dict["sequence_id"])
         if steps:
             first_step = steps[0]
-            CampaignService.generate_step_emails(campaign_dict, first_step, steps)
+            CampaignService.generate_step_transactions(campaign_dict, first_step, steps)
 
         return campaign_dict
 
     # ── Lazy Email Generation ────────────────────────────────────────────
 
     @staticmethod
-    def generate_step_emails(
+    def generate_step_transactions(
         campaign: Dict[str, Any],
         step: Dict[str, Any],
         all_steps: List[Dict[str, Any]]
     ):
         """
-        Generate CampaignEmail records for ONE step only.
-        Uses even-split round-robin for A/B variant assignment.
+        Generate EmailTransaction records for ONE step only.
+        Uses even-split round-robin for A/B variant assignment if variant B exists.
         """
         audience = dynamodb_repo.get_item("audiences", {"id": campaign["audience_id"]})
         if not audience:
@@ -65,13 +70,13 @@ class CampaignService:
 
         lead_ids = audience.get("lead_ids", [])
         if not lead_ids:
-            logger.warning(f"Audience {campaign['audience_id']} has no members")
+            logger.warning(f"Audience {campaign['audience_id']} has no leads")
             return
 
-        # Calculate scheduled_at for this step
-        scheduled_at = CampaignService._calculate_step_time(campaign, step, all_steps)
+        # Calculate scheduled_for for this step
+        scheduled_for = CampaignService._calculate_step_time(campaign, step, all_steps)
 
-        # Shuffle audience for unbiased A/B distribution
+        # Shuffle lead list for unbiased A/B distribution
         shuffled_leads = list(lead_ids)
         random.shuffle(shuffled_leads)
 
@@ -80,23 +85,56 @@ class CampaignService:
         has_b = variants.get("b") is not None
         num_variants = 2 if has_b else 1
 
+        # Batch-load all leads once (for subject-line rendering)
+        fetched_leads = dynamodb_repo.batch_get_items(
+            "leads", [{"id": lid} for lid in shuffled_leads]
+        )
+        leads_by_id = {l["id"]: l for l in fetched_leads}
+
+        # Drop unsubscribed leads before variant assignment
+        shuffled_leads = [
+            lid for lid in shuffled_leads
+            if not (leads_by_id.get(lid) or {}).get("unsubscribed")
+        ]
+
         email_items = []
         for idx, lead_id in enumerate(shuffled_leads):
-            variant_index = idx % num_variants
-            selected_variant = "b" if variant_index == 1 else "a"
+            if num_variants == 2:
+                variant_index = idx % 2
+                selected_variant = "b" if variant_index == 1 else "a"
+            else:
+                selected_variant = "a"
 
-            email = CampaignEmail(
+            step_order = int(step.get("step_order", 1))
+            txn_id = ulid.new().str
+
+            lead = leads_by_id.get(lead_id)
+
+            # Render subject line immediately
+            variant = variants.get(selected_variant)
+            if not variant:
+                variant = variants.get("a", {"title": "Untitled", "body": ""})
+                
+            raw_subject = variant.get("title", "Untitled")
+            rendered_subject = render_template(raw_subject, lead) if lead else raw_subject
+            email = EmailTransaction(
+                PK=f"CAMPAIGN#{campaign['id']}",
+                SK=f"MSG#{lead_id}#{step_order}",
+                transaction_id=txn_id,
                 campaign_id=campaign["id"],
+                sequence_id=campaign.get("sequence_id", ""),
+                step_order=step_order,
                 lead_id=lead_id,
-                step_order=int(step.get("step_order", 1)),
-                selected_variant=selected_variant,
-                status=CampaignEmailStatus.PENDING.value,
-                scheduled_at=scheduled_at
+                audience_id=campaign.get("audience_id"),
+                variant=selected_variant,
+                subject_line=rendered_subject,
+                status=EmailTransactionStatus.QUEUED.value,
+                scheduled_for=scheduled_for
             )
             email_items.append(email.model_dump())
 
         if email_items:
-            dynamodb_repo.batch_write_items("campaign_emails", email_items)
+            dynamodb_repo.batch_write_items("email_transactions", email_items)
 
         # Update campaign's current step order
         step_order = int(step.get("step_order", 1))
@@ -105,8 +143,8 @@ class CampaignService:
         dynamodb_repo.put_item("campaigns", campaign)
 
         logger.info(
-            f"Generated {len(email_items)} emails for campaign '{campaign['name']}' "
-            f"step {step_order} (scheduled at {scheduled_at})"
+            f"Generated {len(email_items)} transactions for campaign '{campaign['name']}' "
+            f"step {step_order} (scheduled for {scheduled_for})"
         )
 
     @staticmethod
@@ -135,32 +173,32 @@ class CampaignService:
     # ── Email Processing (called by thin scheduler) ──────────────────────
 
     @staticmethod
-    def process_due_campaign_emails():
+    def process_due_transactions():
         """
         Main processing loop called by the scheduler every minute.
-        Fetches due emails, sends them, and checks for step completion.
+        Fetches due transactions, sends them, and checks for step completion.
         """
         now_iso = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
-        # Query due campaign emails via GSI
-        due_emails = dynamodb_repo.query_gsi(
-            table_name="campaign_emails",
-            index_name="status-scheduled_at-index",
-            key_condition_expression="#st = :status AND #sa <= :now",
+        # Query due transactions via GSI
+        due_transactions = dynamodb_repo.query_gsi(
+            table_name="email_transactions",
+            index_name="status-scheduled_for-index",
+            key_condition_expression="#st = :status AND #sf <= :now",
             expression_values={
-                ":status": CampaignEmailStatus.PENDING.value,
+                ":status": EmailTransactionStatus.QUEUED.value,
                 ":now": now_iso
             },
             expression_names={
                 "#st": "status",
-                "#sa": "scheduled_at"
+                "#sf": "scheduled_for"
             }
         )
 
-        if not due_emails:
+        if not due_transactions:
             return
 
-        logger.info(f"Found {len(due_emails)} due campaign emails to process")
+        logger.info(f"Found {len(due_transactions)} due transactions to process")
 
         # Load all email accounts once for sender selection
         all_accounts = dynamodb_repo.scan_table("email_accounts")
@@ -168,13 +206,13 @@ class CampaignService:
         # Track which campaigns were processed for step-completion check
         processed_campaign_ids = set()
 
-        for email_record in due_emails:
-            campaign_id = email_record.get("campaign_id")
+        for txn_record in due_transactions:
+            campaign_id = txn_record.get("campaign_id")
 
             # Load campaign
             campaign = dynamodb_repo.get_item("campaigns", {"id": campaign_id})
             if not campaign:
-                logger.warning(f"Campaign {campaign_id} not found, skipping email {email_record['id']}")
+                logger.warning(f"Campaign {campaign_id} not found, skipping transaction {txn_record.get('transaction_id')}")
                 continue
 
             # Skip if campaign is paused/cancelled/completed
@@ -190,9 +228,9 @@ class CampaignService:
                 campaign["updated_at"] = current_time_iso()
                 dynamodb_repo.put_item("campaigns", campaign)
 
-            # Process this email
+            # Process this transaction
             CampaignService._send_single_email(
-                email_record, campaign, all_accounts
+                txn_record, campaign, all_accounts
             )
 
             processed_campaign_ids.add(campaign_id)
@@ -205,15 +243,30 @@ class CampaignService:
 
     @staticmethod
     def _send_single_email(
-        email_record: Dict[str, Any],
+        txn_record: Dict[str, Any],
         campaign: Dict[str, Any],
         all_accounts: List[Dict[str, Any]]
     ):
         """Send a single campaign email — template rendering, sender selection, and dispatch."""
-        email_id = email_record.get("id")
-        lead_id = email_record.get("lead_id")
-        step_order = int(email_record.get("step_order", 0))
-        variant_key = email_record.get("selected_variant", "a")
+        txn_id = txn_record.get("transaction_id")
+        lead_id = txn_record.get("lead_id")
+        step_order = int(txn_record.get("step_order", 0))
+        variant_key = txn_record.get("variant", "a")
+        txn_keys = {"PK": txn_record["PK"], "SK": txn_record["SK"]}
+
+        # Claim the transaction (queued -> sending) so a slow cycle or a
+        # second app instance can't double-send the same email.
+        claimed = dynamodb_repo.update_item(
+            "email_transactions",
+            txn_keys,
+            "SET #st = :sending",
+            {":sending": EmailTransactionStatus.SENDING.value, ":queued": EmailTransactionStatus.QUEUED.value},
+            {"#st": "status"},
+            condition_expression="#st = :queued"
+        )
+        if not claimed:
+            logger.info(f"Transaction {txn_id} already claimed elsewhere, skipping")
+            return
 
         try:
             # Load sequence
@@ -232,6 +285,14 @@ class CampaignService:
             if not lead:
                 raise Exception(f"Lead {lead_id} not found")
 
+            # Skip leads that unsubscribed after this transaction was generated
+            if lead.get("unsubscribed"):
+                TransactionService.update_transaction(txn_id, {
+                    "status": "unsubscribed"
+                }, keys=txn_keys)
+                logger.info(f"Lead {lead_id} is unsubscribed, skipping email {txn_id}")
+                return
+
             # Select sender from the campaign's sender pool
             selected_account = AccountSelectionService.select_from_pool(
                 campaign.get("sender_email_ids", []),
@@ -239,10 +300,18 @@ class CampaignService:
             )
             if not selected_account:
                 logger.warning(
-                    f"No available sender for email {email_id}. "
+                    f"No available sender for email {txn_id}. "
                     "All accounts at daily limit or inactive."
                 )
-                return  # Leave as pending — will retry next cycle
+                # Release the claim so it retries next cycle
+                dynamodb_repo.update_item(
+                    "email_transactions",
+                    txn_keys,
+                    "SET #st = :queued",
+                    {":queued": EmailTransactionStatus.QUEUED.value},
+                    {"#st": "status"}
+                )
+                return
 
             refresh_token = selected_account.get("refresh_token")
             if not refresh_token:
@@ -264,6 +333,21 @@ class CampaignService:
             rendered_subject = render_template(subject, lead)
             rendered_body = render_template(body, lead)
 
+            # Append unsubscribe footer (required for cold outreach compliance)
+            base_url = os.getenv("APP_BASE_URL", "").rstrip("/")
+            tracked_urls = []
+            if base_url:
+                unsubscribe_url = f"{base_url}/unsubscribe/{txn_id}"
+                rendered_body += (
+                    f'<br><br><p style="font-size:12px;color:#888">'
+                    f'<a href="{unsubscribe_url}">Unsubscribe</a></p>'
+                )
+                # Open/click tracking: rewrite links + append pixel.
+                # The unsubscribe link is skipped (points at base_url).
+                rendered_body, tracked_urls = instrument_html(
+                    rendered_body, f"t-{txn_id}", base_url
+                )
+
             # Append signature if sender has one
             signature_html = selected_account.get("signature_html")
             if not signature_html:
@@ -281,7 +365,7 @@ class CampaignService:
                     signature_html = "<br>".join(sig_parts)
 
             # Send email
-            send_email(
+            provider_msg_id = send_email(
                 to_email=lead.get("email"),
                 subject=rendered_subject,
                 body=rendered_body,
@@ -289,12 +373,15 @@ class CampaignService:
                 signature_html=signature_html
             )
 
-            # Update campaign email record
+            # Update email_transaction record via TransactionService
             now_iso = current_time_iso()
-            email_record["status"] = CampaignEmailStatus.SENT.value
-            email_record["sender_email_id"] = selected_account.get("id")
-            email_record["sent_at"] = now_iso
-            dynamodb_repo.put_item("campaign_emails", email_record)
+            TransactionService.update_transaction(txn_id, {
+                "status": "sent",
+                "provider": "gmail",
+                "provider_message_id": provider_msg_id if provider_msg_id else None,
+                "sender_email_id": selected_account.get("id"),
+                "tracked_urls": tracked_urls if tracked_urls else None
+            }, keys=txn_keys)
 
             # Update sender account counters
             selected_account["sent_today"] = int(selected_account.get("sent_today", 0)) + 1
@@ -303,7 +390,7 @@ class CampaignService:
 
             # Log
             log_entry = {
-                "email_id": email_id,
+                "email_id": txn_id,
                 "lead_id": lead_id,
                 "sender_account_id": selected_account.get("id"),
                 "sender_email": selected_account.get("email"),
@@ -313,19 +400,21 @@ class CampaignService:
             dynamodb_repo.put_item("email_logs", log_entry)
 
             logger.info(
-                f"Sent campaign email {email_id} to {lead.get('email')} "
+                f"Sent campaign email {txn_id} to {lead.get('email')} "
                 f"via {selected_account.get('email')}"
             )
 
         except Exception as e:
-            logger.error(f"Failed to send campaign email {email_id}: {e}")
+            logger.error(f"Failed to send campaign email {txn_id}: {e}")
 
-            email_record["status"] = CampaignEmailStatus.FAILED.value
-            dynamodb_repo.put_item("campaign_emails", email_record)
+            TransactionService.update_transaction(txn_id, {
+                "status": "failed",
+                "error_message": str(e)
+            }, keys=txn_keys)
 
             # Log failure
             log_entry = {
-                "email_id": email_id,
+                "email_id": txn_id,
                 "lead_id": lead_id,
                 "sender_account_id": "",
                 "sender_email": "",
@@ -346,28 +435,31 @@ class CampaignService:
         campaign_id = campaign["id"]
         current_order = int(campaign.get("current_step_order", 0))
 
-        # Get all campaign emails for the current step
-        all_campaign_emails = dynamodb_repo.query_gsi(
-            table_name="campaign_emails",
-            index_name="campaign_id-index",
-            key_condition_expression="#cid = :cid",
-            expression_values={":cid": campaign_id},
-            expression_names={"#cid": "campaign_id"}
+        # Get all transactions for this campaign via PK
+        all_transactions = dynamodb_repo.query_table(
+            table_name="email_transactions",
+            key_condition_expression="#pk = :pk",
+            expression_values={":pk": f"CAMPAIGN#{campaign_id}"},
+            expression_names={"#pk": "PK"}
         )
 
         # Filter to current step
-        current_step_emails = [
-            ce for ce in all_campaign_emails
-            if int(ce.get("step_order", 0)) == current_order
+        current_step_txns = [
+            t for t in all_transactions
+            if int(t.get("step_order", 0)) == current_order
         ]
 
-        if not current_step_emails:
+        if not current_step_txns:
             return
 
-        # Check if all are done (sent or failed)
+        # Check if all are done (anything that isn't QUEUED or in-flight SENDING)
+        not_done_statuses = (
+            EmailTransactionStatus.QUEUED.value,
+            EmailTransactionStatus.SENDING.value
+        )
         all_done = all(
-            ce.get("status") in (CampaignEmailStatus.SENT.value, CampaignEmailStatus.FAILED.value)
-            for ce in current_step_emails
+            t.get("status") not in not_done_statuses
+            for t in current_step_txns
         )
 
         if not all_done:
@@ -385,9 +477,9 @@ class CampaignService:
             next_step = all_steps[current_step_idx + 1]
             logger.info(
                 f"Step {current_order} complete for campaign '{campaign['name']}'. "
-                f"Generating step {next_step['step_order']} emails."
+                f"Generating step {next_step['step_order']} transactions."
             )
-            CampaignService.generate_step_emails(campaign, next_step, all_steps)
+            CampaignService.generate_step_transactions(campaign, next_step, all_steps)
         else:
             # All steps done — mark campaign as completed
             campaign["status"] = CampaignStatus.COMPLETED.value
@@ -404,59 +496,6 @@ class CampaignService:
         steps = sequence.get("steps", [])
         return sorted(steps, key=lambda s: int(s.get("step_order", 0)))
 
-    # ── Campaign Statistics ──────────────────────────────────────────────
-
-    @staticmethod
-    def get_campaign_stats(campaign_id: str) -> Dict[str, Any]:
-        """
-        Compute campaign stats: total, sent, pending, failed,
-        current step, total steps, completion %.
-        """
-        campaign = dynamodb_repo.get_item("campaigns", {"id": campaign_id})
-        if not campaign:
-            return {}
-
-        # Get all campaign emails
-        campaign_emails = dynamodb_repo.query_gsi(
-            table_name="campaign_emails",
-            index_name="campaign_id-index",
-            key_condition_expression="#cid = :cid",
-            expression_values={":cid": campaign_id},
-            expression_names={"#cid": "campaign_id"}
-        )
-
-        total = len(campaign_emails)
-        sent = sum(1 for ce in campaign_emails if ce.get("status") == CampaignEmailStatus.SENT.value)
-        pending = sum(1 for ce in campaign_emails if ce.get("status") == CampaignEmailStatus.PENDING.value)
-        failed = sum(1 for ce in campaign_emails if ce.get("status") == CampaignEmailStatus.FAILED.value)
-
-        # Get total steps
-        sequence_id = campaign.get("sequence_id")
-        all_steps = CampaignService._get_ordered_steps(sequence_id) if sequence_id else []
-        total_steps = len(all_steps)
-
-        # Get audience size for overall progress
-        audience_id = campaign.get("audience_id")
-        audience = dynamodb_repo.get_item("audiences", {"id": audience_id}) if audience_id else None
-        audience_size = len(audience.get("lead_ids", [])) if audience else 0
-
-        # Total expected = audience_size * total_steps
-        total_expected = audience_size * total_steps
-        completion_pct = round((sent / total_expected * 100), 1) if total_expected > 0 else 0.0
-
-        return {
-            "campaign_id": campaign_id,
-            "status": campaign.get("status"),
-            "total_emails_generated": total,
-            "sent": sent,
-            "pending": pending,
-            "failed": failed,
-            "current_step_order": int(campaign.get("current_step_order", 0)),
-            "total_steps": total_steps,
-            "audience_size": audience_size,
-            "total_expected_emails": total_expected,
-            "completion_percentage": completion_pct,
-        }
 
     # ── Validation ───────────────────────────────────────────────────────
 
@@ -468,19 +507,21 @@ class CampaignService:
             return False, "Campaign not found"
 
         if campaign.get("status") == CampaignStatus.RUNNING.value:
-            # Check for pending emails
-            campaign_emails = dynamodb_repo.query_gsi(
-                table_name="campaign_emails",
-                index_name="campaign_id-index",
-                key_condition_expression="#cid = :cid",
-                expression_values={":cid": campaign_id},
-                expression_names={"#cid": "campaign_id"}
+            # Check for queued transactions
+            txns = dynamodb_repo.query_table(
+                table_name="email_transactions",
+                key_condition_expression="#pk = :pk",
+                expression_values={":pk": f"CAMPAIGN#{campaign_id}"},
+                expression_names={"#pk": "PK"}
             )
             pending = [
-                ce for ce in campaign_emails
-                if ce.get("status") == CampaignEmailStatus.PENDING.value
+                t for t in txns
+                if t.get("status") in (
+                    EmailTransactionStatus.QUEUED.value,
+                    EmailTransactionStatus.SENDING.value
+                )
             ]
             if pending:
-                return False, f"Cannot delete: campaign has {len(pending)} pending emails"
+                return False, f"Cannot delete: campaign has {len(pending)} queued emails"
 
         return True, "OK"

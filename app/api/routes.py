@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, BackgroundTasks
 from typing import List, Optional
 import os
 from datetime import timezone
@@ -10,10 +10,11 @@ from app.models.schemas import (
     TestEmailRequest, Lead,
     BulkScheduleRequest, BulkScheduleFilterRequest,
     UpdateLimitRequest, UpdateActiveRequest,
-    UpdateSignatureRequest, UpdateEmailAccountRequest
+    UpdateSignatureRequest, UpdateEmailAccountRequest, Audience
 )
 from app.services import gmail_service
 from app.services.csv_service import parse_leads_csv
+from app.services.lead_service import upsert_leads
 from app.repositories import dynamodb_repo
 
 router = APIRouter()
@@ -240,35 +241,64 @@ async def check_account_status(account_id: str):
         
     return {"email": account_dict.get("email"), "status": account_dict.get("status", "verified")}
 
-@router.post("/leads/upload")
-async def upload_leads(file: UploadFile = File(...)):
+
+
+@router.post("/leads/upload", tags=["Leads"])
+async def upload_leads(
+    name: str = Form(...),
+    description: str = Form(None),
+    tags: str = Form(None),
+    file: UploadFile = File(...)
+):
+    """
+    Upload a CSV of leads and create an Audience automatically.
+    Tags should be comma-separated (e.g. 'marketing,klipkanvas').
+    """
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="File must be a CSV")
-        
+
     content = await file.read()
     try:
         parsed_leads = parse_leads_csv(content)
-        leads_to_insert = [Lead(**lead).model_dump() for lead in parsed_leads]
-        
-        # Batch insert
-        dynamodb_repo.batch_write_items("leads", leads_to_insert)
-        
-        # Derive lead list name from filename
-        base_name = file.filename.rsplit(".", 1)[0]
-        lead_name = base_name.replace("_", " ").replace("-", " ").title()
-        lead_id = str(uuid.uuid4())
-        
+
+        # Parse tags from comma-separated string
+        tag_list = []
+        if tags:
+            tag_list = [t.strip() for t in tags.split(",") if t.strip()]
+
+        # Insert leads, deduplicating by email against existing leads
+        lead_ids, reused_count = upsert_leads(parsed_leads, tag_list)
+
+        # Create Audience
+        audience = Audience(
+            name=name,
+            description=description,
+            file_name=file.filename,
+            tags=tag_list,
+            lead_ids=lead_ids,
+            num_leads=len(lead_ids)
+        )
+        dynamodb_repo.put_item("audiences", audience.model_dump())
+
         return {
-            "message": "Leads uploaded successfully.",
-            "lead_name": lead_name,
-            "lead_id": lead_id,
-            "file_name": file.filename,
-            "num_leads": len(leads_to_insert)
+            "message": "Upload completed successfully",
+            "new_leads": len(lead_ids) - reused_count,
+            "reused_leads": reused_count,
+            "audience": {
+                "id": audience.id,
+                "name": audience.name,
+                "description": audience.description,
+                "file_name": audience.file_name,
+                "tags": audience.tags,
+                "num_leads": audience.num_leads,
+                "created_at": audience.created_at
+            }
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/leads")
+
+@router.get("/leads", tags=["Leads"])
 async def get_leads(limit: int = 100, company: Optional[str] = None):
     leads = dynamodb_repo.scan_table("leads")
     
@@ -385,6 +415,42 @@ async def schedule_emails(request: ScheduleEmailRequest):
 async def get_scheduled_emails():
     emails = dynamodb_repo.scan_table("scheduled_emails")
     return {"scheduled_emails": emails}
+
+@router.get("/unsubscribe/{transaction_id}", tags=["Unsubscribe"])
+async def unsubscribe(transaction_id: str):
+    """
+    Recipient-facing unsubscribe link (embedded in outgoing emails, no auth).
+    Marks the transaction unsubscribed and flags the lead so future
+    campaign steps skip them.
+    """
+    from fastapi.responses import HTMLResponse
+    from app.services.transaction_service import TransactionService
+    from app.models.schemas import current_time_iso
+
+    txn = TransactionService._find_transaction_raw(transaction_id)
+    if not txn:
+        raise HTTPException(status_code=404, detail="Unsubscribe link is invalid")
+
+    TransactionService.update_transaction(
+        transaction_id,
+        {"status": "unsubscribed"},
+        keys={"PK": txn["PK"], "SK": txn["SK"]}
+    )
+
+    lead_id = txn.get("lead_id")
+    if lead_id:
+        lead = dynamodb_repo.get_item("leads", {"id": lead_id})
+        if lead and not lead.get("unsubscribed"):
+            lead["unsubscribed"] = True
+            lead["unsubscribed_at"] = current_time_iso()
+            dynamodb_repo.put_item("leads", lead)
+
+    return HTMLResponse(
+        "<html><body style='font-family:sans-serif;text-align:center;padding-top:4rem'>"
+        "<h2>You have been unsubscribed.</h2>"
+        "<p>You will not receive further emails from this sender.</p>"
+        "</body></html>"
+    )
 
 @router.post("/emails/test")
 async def send_test_email(request: TestEmailRequest):

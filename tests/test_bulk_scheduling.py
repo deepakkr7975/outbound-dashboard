@@ -53,10 +53,11 @@ def test_bulk_schedule_1_lead(mock_dynamodb):
     assert data["failed_count"] == 0
     mock_dynamodb.batch_write_items.assert_called_once()
     
-    # Check rendered templates
+    # Raw templates are stored — mail-merge rendering happens at send time
+    # in the scheduler cron using the full lead dict.
     write_args = mock_dynamodb.batch_write_items.call_args[0][1]
-    assert write_args[0]["subject"] == "Hi John"
-    assert write_args[0]["body"] == "From Nike"
+    assert write_args[0]["subject"] == "Hi {{name}}"
+    assert write_args[0]["body"] == "From {{company}}"
 
 def test_bulk_schedule_10_leads_with_failures(mock_dynamodb):
     # Setup mock to return an account, but only find 8 out of 10 leads
