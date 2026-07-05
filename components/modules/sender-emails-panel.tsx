@@ -1,0 +1,472 @@
+"use client"
+
+import * as React from "react"
+import { toast } from "sonner"
+
+import { SenderEmailPreviewSheet } from "@/components/modules/sender-email-preview-sheet"
+import { ConfirmDialog } from "@/components/dashboard/confirm-dialog"
+import { FilterBar } from "@/components/dashboard/filter-bar"
+import { SortableTableHead } from "@/components/dashboard/sortable-table-head"
+import { LinkedStatusBadge } from "@/components/dashboard/status-badge"
+import { PageHeader } from "@/components/dashboard/page-header"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Textarea } from "@/components/ui/textarea"
+import { useTableSort } from "@/hooks/use-table-sort"
+import { useUrlPreview } from "@/hooks/use-url-preview"
+import { senderEmails as initialData } from "@/lib/data/sender-emails"
+import { campaigns } from "@/lib/data/campaigns"
+import { formatDate } from "@/lib/format"
+import type { SenderEmail } from "@/lib/types"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { MoreVerticalCircle01Icon } from "@hugeicons/core-free-icons"
+
+type SenderSortColumn =
+  | "email"
+  | "domain"
+  | "domain_name"
+  | "status"
+  | "linked_campaigns"
+  | "signature"
+  | "created_at"
+
+export function SenderEmailsPanel() {
+  const { previewId, setPreviewId } = useUrlPreview()
+  const [data, setData] = React.useState(initialData)
+  const [previewSender, setPreviewSender] = React.useState<SenderEmail | null>(null)
+  const [previewOpen, setPreviewOpen] = React.useState(false)
+  const [search, setSearch] = React.useState("")
+  const [statusFilter, setStatusFilter] = React.useState("all")
+  const [signatureFilter, setSignatureFilter] = React.useState("all")
+  const [domainFilter, setDomainFilter] = React.useState("all")
+  const { column: sortColumn, direction: sortDirection, toggle: toggleSort, sort } =
+    useTableSort<SenderSortColumn>("email")
+  const [addOpen, setAddOpen] = React.useState(false)
+  const [signatureOpen, setSignatureOpen] = React.useState(false)
+  const [deleteOpen, setDeleteOpen] = React.useState(false)
+  const [selected, setSelected] = React.useState<SenderEmail | null>(null)
+  const [form, setForm] = React.useState({
+    email: "",
+    domain: "revtrix.in",
+    domain_name: "revtrix",
+    signature: "",
+  })
+
+  const domains = Array.from(new Set(data.map((row) => row.domain)))
+
+  const filtered = sort(
+    data.filter((row) => {
+      const matchesSearch =
+        !search ||
+        row.email.toLowerCase().includes(search.toLowerCase()) ||
+        row.domain.toLowerCase().includes(search.toLowerCase())
+      const matchesStatus =
+        statusFilter === "all" || row.linked_status === statusFilter
+      const matchesSignature =
+        signatureFilter === "all" ||
+        (signatureFilter === "set" ? !!row.signature : !row.signature)
+      const matchesDomain =
+        domainFilter === "all" || row.domain === domainFilter
+      return matchesSearch && matchesStatus && matchesSignature && matchesDomain
+    }),
+    {
+      email: (row) => row.email,
+      domain: (row) => row.domain,
+      domain_name: (row) => row.domain_name,
+      status: (row) => row.linked_status,
+      linked_campaigns: (row) => row.linked_campaign_ids.length,
+      signature: (row) => (row.signature ? 1 : 0),
+      created_at: (row) => row.created_at,
+    }
+  )
+
+  const activeFilterCount = [
+    !!search,
+    statusFilter !== "all",
+    signatureFilter !== "all",
+    domainFilter !== "all",
+  ].filter(Boolean).length
+
+  function clearFilters() {
+    setSearch("")
+    setStatusFilter("all")
+    setSignatureFilter("all")
+    setDomainFilter("all")
+  }
+
+  function getCampaignNames(ids: string[]) {
+    return ids
+      .map((id) => campaigns.find((c) => c.campaign_id === id)?.name ?? id)
+      .join(", ")
+  }
+
+  React.useEffect(() => {
+    if (previewId) {
+      const sender = data.find((s) => s.id === previewId)
+      if (sender) {
+        setPreviewSender(sender)
+        setPreviewOpen(true)
+      }
+    }
+  }, [previewId, data])
+
+  function openPreview(sender: SenderEmail) {
+    setPreviewSender(sender)
+    setPreviewOpen(true)
+    setPreviewId(sender.id)
+  }
+
+  function handlePreviewChange(open: boolean) {
+    setPreviewOpen(open)
+    if (!open) setPreviewId(null)
+  }
+
+  function handleAdd() {
+    if (!form.email.includes("@")) {
+      toast.error("Enter a valid email address")
+      return
+    }
+    const newEmail: SenderEmail = {
+      id: `snd_${Date.now()}`,
+      email: form.email,
+      domain: form.domain,
+      domain_name: form.domain_name,
+      signature: form.signature || null,
+      linked_status: "free",
+      linked_campaign_ids: [],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+    setData((prev) => [newEmail, ...prev])
+    setAddOpen(false)
+    setForm({ email: "", domain: "revtrix.in", domain_name: "revtrix", signature: "" })
+    toast.success("Sender email added")
+  }
+
+  function handleSaveSignature() {
+    if (!selected) return
+    setData((prev) =>
+      prev.map((row) =>
+        row.id === selected.id
+          ? {
+              ...row,
+              signature: form.signature || null,
+              updated_at: new Date().toISOString(),
+            }
+          : row
+      )
+    )
+    setSignatureOpen(false)
+    toast.success("Signature updated")
+  }
+
+  function handleDelete() {
+    if (!selected) return
+    if (selected.linked_status === "linked") {
+      toast.error(
+        `Unlink from campaign(s) ${getCampaignNames(selected.linked_campaign_ids)} before deleting.`
+      )
+      return
+    }
+    setData((prev) => prev.filter((row) => row.id !== selected.id))
+    toast.success("Sender email deleted")
+  }
+
+  return (
+    <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+      <PageHeader
+        title="Sender Emails"
+        description="Manage sending inboxes and their campaign availability"
+        action={{ label: "Add Email", onClick: () => setAddOpen(true) }}
+      />
+      <FilterBar
+        searchLabel="Search"
+        searchPlaceholder="Search by email or domain…"
+        searchValue={search}
+        onSearchChange={setSearch}
+        resultCount={filtered.length}
+        resultLabel={filtered.length === 1 ? "sender" : "senders"}
+        activeFilterCount={activeFilterCount}
+        onClear={clearFilters}
+        filters={[
+          {
+            id: "status",
+            label: "Status",
+            value: statusFilter,
+            options: [
+              { label: "All statuses", value: "all" },
+              { label: "Free", value: "free" },
+              { label: "Linked", value: "linked" },
+            ],
+            onChange: setStatusFilter,
+          },
+          {
+            id: "signature",
+            label: "Signature",
+            value: signatureFilter,
+            options: [
+              { label: "All", value: "all" },
+              { label: "Set", value: "set" },
+              { label: "Not set", value: "not_set" },
+            ],
+            onChange: setSignatureFilter,
+          },
+          {
+            id: "domain",
+            label: "Domain",
+            value: domainFilter,
+            options: [
+              { label: "All domains", value: "all" },
+              ...domains.map((domain) => ({ label: domain, value: domain })),
+            ],
+            onChange: setDomainFilter,
+          },
+        ]}
+      />
+      <div className="px-4 lg:px-6">
+        <div className="overflow-hidden rounded-xl border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <SortableTableHead
+                  column="email"
+                  sortColumn={sortColumn}
+                  sortDirection={sortDirection}
+                  onSort={toggleSort}
+                >
+                  Email
+                </SortableTableHead>
+                <SortableTableHead
+                  column="domain"
+                  sortColumn={sortColumn}
+                  sortDirection={sortDirection}
+                  onSort={toggleSort}
+                >
+                  Domain
+                </SortableTableHead>
+                <SortableTableHead
+                  column="domain_name"
+                  sortColumn={sortColumn}
+                  sortDirection={sortDirection}
+                  onSort={toggleSort}
+                >
+                  Domain Name
+                </SortableTableHead>
+                <SortableTableHead
+                  column="status"
+                  sortColumn={sortColumn}
+                  sortDirection={sortDirection}
+                  onSort={toggleSort}
+                >
+                  Status
+                </SortableTableHead>
+                <SortableTableHead
+                  column="linked_campaigns"
+                  sortColumn={sortColumn}
+                  sortDirection={sortDirection}
+                  onSort={toggleSort}
+                >
+                  Linked Campaigns
+                </SortableTableHead>
+                <SortableTableHead
+                  column="signature"
+                  sortColumn={sortColumn}
+                  sortDirection={sortDirection}
+                  onSort={toggleSort}
+                >
+                  Signature
+                </SortableTableHead>
+                <SortableTableHead
+                  column="created_at"
+                  sortColumn={sortColumn}
+                  sortDirection={sortDirection}
+                  onSort={toggleSort}
+                >
+                  Created
+                </SortableTableHead>
+                <TableHead className="w-10" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((row) => (
+                <TableRow
+                  key={row.id}
+                  className="cursor-pointer"
+                  onClick={() => openPreview(row)}
+                >
+                  <TableCell className="font-medium">{row.email}</TableCell>
+                  <TableCell>{row.domain}</TableCell>
+                  <TableCell>{row.domain_name}</TableCell>
+                  <TableCell>
+                    <LinkedStatusBadge status={row.linked_status} />
+                  </TableCell>
+                  <TableCell>
+                    {row.linked_campaign_ids.length > 0 ? (
+                      <Badge variant="secondary">
+                        {row.linked_campaign_ids.length}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {row.signature ? (
+                      <Badge variant="outline">Set</Badge>
+                    ) : (
+                      <span className="text-muted-foreground">Not set</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {formatDate(row.created_at)}
+                  </TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        render={
+                          <Button variant="ghost" size="icon-sm" />
+                        }
+                      >
+                        <HugeiconsIcon icon={MoreVerticalCircle01Icon} strokeWidth={2} />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setSelected(row)
+                            setForm((f) => ({ ...f, signature: row.signature ?? "" }))
+                            setSignatureOpen(true)
+                          }}
+                        >
+                          Signature
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onClick={() => {
+                            setSelected(row)
+                            setDeleteOpen(true)
+                          }}
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Sender Email</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div className="grid gap-1.5">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                placeholder="outreach@revtrix.in"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="domain">Domain</Label>
+              <Input
+                id="domain"
+                value={form.domain}
+                onChange={(e) => setForm({ ...form, domain: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="domain_name">Domain Name</Label>
+              <Input
+                id="domain_name"
+                value={form.domain_name}
+                onChange={(e) => setForm({ ...form, domain_name: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="sig">Signature (optional)</Label>
+              <Textarea
+                id="sig"
+                value={form.signature}
+                onChange={(e) => setForm({ ...form, signature: e.target.value })}
+                placeholder="Best, {first_name}"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAdd}>Add Email</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={signatureOpen} onOpenChange={setSignatureOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Signature — {selected?.email}</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            value={form.signature}
+            onChange={(e) => setForm({ ...form, signature: e.target.value })}
+            rows={6}
+            placeholder="Use tokens: {first_name}, {company}, {role}, {city}"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSignatureOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveSignature}>Save Signature</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="Delete sender email?"
+        description={`This will permanently remove ${selected?.email}. This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={handleDelete}
+      />
+
+      <SenderEmailPreviewSheet
+        sender={previewSender}
+        open={previewOpen}
+        onOpenChange={handlePreviewChange}
+      />
+    </div>
+  )
+}

@@ -1,0 +1,46 @@
+[
+  {
+    "id": "snd_1",
+    "email": "outreach@revtrix.in",
+    "domain": "revtrix.in",
+    "domain_name": "revtrix",
+    "signature": "<p>Best,<br/>The Revtrix Team</p>",
+    "linked_status": "linked",
+    "linked_campaign_ids": ["camp_winter"],
+    "created_at": "2026-01-15T10:00:00Z",
+    "updated_at": "2026-03-20T14:30:00Z"
+  },
+  {
+    "id": "snd_2",
+    "email": "hello@revtrix.in",
+    "domain": "revtrix.in",
+    "domain_name": "revtrix",
+    "signature": null,
+    "linked_status": "linked",
+    "linked_campaign_ids": ["camp_winter", "camp_spring"],
+    "created_at": "2026-01-20T11:00:00Z",
+    "updated_at": "2026-04-01T09:15:00Z"
+  },
+  {
+    "id": "snd_3",
+    "email": "sales@revtrix.in",
+    "domain": "revtrix.in",
+    "domain_name": "revtrix",
+    "signature": "<p>Cheers,<br/>{first_name} from Revtrix</p>",
+    "linked_status": "free",
+    "linked_campaign_ids": [],
+    "created_at": "2026-02-10T08:00:00Z",
+    "updated_at": "2026-02-10T08:00:00Z"
+  },
+  {
+    "id": "snd_4",
+    "email": "team@revtrix.io",
+    "domain": "revtrix.io",
+    "domain_name": "revtrix",
+    "signature": null,
+    "linked_status": "free",
+    "linked_campaign_ids": [],
+    "created_at": "2026-03-05T16:45:00Z",
+    "updated_at": "2026-03-05T16:45:00Z"
+  }
+]

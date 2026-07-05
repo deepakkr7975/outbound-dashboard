@@ -1,0 +1,39 @@
+import { ThemeProvider } from "next-themes"
+
+import { AppSidebar } from "@/components/app-sidebar"
+import { SiteHeader } from "@/components/site-header"
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
+import { Toaster } from "@/components/ui/sonner"
+import { ExportProvider } from "@/hooks/use-exports"
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark">
+      <ExportProvider>
+      <SidebarProvider
+        style={
+          {
+            "--sidebar-width": "calc(var(--spacing) * 80)",
+            "--header-height": "calc(var(--spacing) * 14)",
+          } as React.CSSProperties
+        }
+      >
+        <AppSidebar variant="inset" />
+        <SidebarInset>
+          <SiteHeader />
+          <div className="flex flex-1 flex-col">
+            <div className="@container/main flex flex-1 flex-col gap-2">
+              {children}
+            </div>
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+      <Toaster position="bottom-right" />
+      </ExportProvider>
+    </ThemeProvider>
+  )
+}

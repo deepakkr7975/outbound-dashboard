@@ -1,0 +1,32 @@
+[
+  {
+    "id": "7ab28193-e04a-4565-adb0-f7dc5ebf050d",
+    "name": "Internship",
+    "description": "Testing Audience",
+    "file_name": "internship_leads.csv",
+    "tags": ["marketing_head", "klipkanvas"],
+    "member_count": 248,
+    "created_at": "2026-02-01T09:00:00Z",
+    "updated_at": "2026-03-15T11:20:00Z"
+  },
+  {
+    "id": "aud_q1",
+    "name": "Q1 SaaS Prospects",
+    "description": "VP-level contacts at mid-market SaaS companies",
+    "file_name": "q1_saas_prospects.csv",
+    "tags": ["saas", "enterprise"],
+    "member_count": 512,
+    "created_at": "2026-01-10T08:30:00Z",
+    "updated_at": "2026-02-28T17:00:00Z"
+  },
+  {
+    "id": "aud_eu",
+    "name": "EU Expansion",
+    "description": "European market outreach list",
+    "file_name": "eu_expansion.csv",
+    "tags": ["europe", "expansion"],
+    "member_count": 186,
+    "created_at": "2026-03-01T12:00:00Z",
+    "updated_at": "2026-03-01T12:00:00Z"
+  }
+]

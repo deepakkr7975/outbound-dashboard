@@ -1,0 +1,149 @@
+[
+  {
+    "sequence_id": "seq_winter",
+    "name": "Winter Outreach",
+    "description": "This is for the Winter Collection",
+    "total_steps": 3,
+    "has_ab_testing": true,
+    "steps": [
+      {
+        "step_order": 1,
+        "wait_days": 0,
+        "variants": {
+          "a": {
+            "title": "Quick question, {first_name}",
+            "body": "Hi {first_name},\n\nI noticed {company} is growing fast. Would love to connect."
+          },
+          "b": {
+            "title": "{first_name}, thought of you",
+            "body": "Hi {first_name},\n\nI noticed {company} is growing fast. Would love to connect."
+          }
+        }
+      },
+      {
+        "step_order": 2,
+        "wait_days": 3,
+        "variants": {
+          "a": {
+            "title": "Following up — {company}",
+            "body": "Hi {first_name},\n\nJust circling back on my last note. Any interest?"
+          },
+          "b": null
+        }
+      },
+      {
+        "step_order": 3,
+        "wait_days": 5,
+        "variants": {
+          "a": {
+            "title": "Last note from Revtrix",
+            "body": "Hi {first_name},\n\nI'll keep this brief — happy to chat if timing works."
+          },
+          "b": null
+        }
+      }
+    ],
+    "is_scheduled": true,
+    "is_completed": false,
+    "sequence_completion": 42,
+    "sequence_steps": { "email 1": 248, "email 2": 186, "email 3": 98 },
+    "created_at": "2026-01-05T09:00:00Z",
+    "updated_at": "2026-03-28T14:00:00Z"
+  },
+  {
+    "sequence_id": "seq_spring",
+    "name": "Spring Follow-up",
+    "description": "Re-engagement sequence for warm leads",
+    "total_steps": 2,
+    "has_ab_testing": false,
+    "steps": [
+      {
+        "step_order": 1,
+        "wait_days": 0,
+        "variants": {
+          "a": {
+            "title": "Checking in, {first_name}",
+            "body": "Hi {first_name},\n\nHope things are going well at {company}."
+          },
+          "b": null
+        }
+      },
+      {
+        "step_order": 2,
+        "wait_days": 7,
+        "variants": {
+          "a": {
+            "title": "One more thought",
+            "body": "Hi {first_name},\n\nWanted to share a quick idea for {role}s at {company}."
+          },
+          "b": null
+        }
+      }
+    ],
+    "is_scheduled": false,
+    "is_completed": true,
+    "sequence_completion": 120,
+    "sequence_steps": { "email 1": 512, "email 2": 340 },
+    "created_at": "2026-02-01T10:00:00Z",
+    "updated_at": "2026-04-10T08:00:00Z"
+  },
+  {
+    "sequence_id": "seq_eu",
+    "name": "EU Introduction",
+    "description": "Initial outreach for European prospects",
+    "total_steps": 4,
+    "has_ab_testing": false,
+    "steps": [
+      {
+        "step_order": 1,
+        "wait_days": 0,
+        "variants": {
+          "a": {
+            "title": "Hello from Revtrix",
+            "body": "Hi {first_name},\n\nReaching out from Revtrix regarding {company}."
+          },
+          "b": null
+        }
+      },
+      {
+        "step_order": 2,
+        "wait_days": 4,
+        "variants": {
+          "a": {
+            "title": "Quick follow-up",
+            "body": "Hi {first_name},\n\nFollowing up on my previous email."
+          },
+          "b": null
+        }
+      },
+      {
+        "step_order": 3,
+        "wait_days": 7,
+        "variants": {
+          "a": {
+            "title": "Value for {company}",
+            "body": "Hi {first_name},\n\nThought this might be relevant for your team in {city}."
+          },
+          "b": null
+        }
+      },
+      {
+        "step_order": 4,
+        "wait_days": 10,
+        "variants": {
+          "a": {
+            "title": "Closing the loop",
+            "body": "Hi {first_name},\n\nLast message from me — let me know if you'd like to chat."
+          },
+          "b": null
+        }
+      }
+    ],
+    "is_scheduled": false,
+    "is_completed": false,
+    "sequence_completion": 0,
+    "sequence_steps": { "email 1": 0, "email 2": 0, "email 3": 0, "email 4": 0 },
+    "created_at": "2026-03-15T12:00:00Z",
+    "updated_at": "2026-03-15T12:00:00Z"
+  }
+]

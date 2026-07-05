@@ -1,0 +1,48 @@
+---
+pid: 31032
+cwd: "C:\Users\itswa\Downloads\outbound-dashboard"
+command: "cmd /c \"cd /d C:\\Users\\itswa\\Downloads\\outbound-dashboard && npm run build 2>&1\""
+started_at: 2026-07-03T20:34:13.858Z
+running_for_ms: 9020000  
+---
+
+> outbound-dashboard@0.1.0 build
+> next build
+
+▲ Next.js 16.2.10 (Turbopack)
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 7.6s
+  Running TypeScript ...
+  Finished TypeScript in 10.3s ...
+  Collecting page data using 15 workers ...
+  Generating static pages using 15 workers (0/14) ...
+  Generating static pages using 15 workers (3/14) 
+  Generating static pages using 15 workers (6/14) 
+  Generating static pages using 15 workers (10/14) 
+✓ Generating static pages using 15 workers (14/14) in 1178ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /dashboard
+├ ○ /dashboard/account
+├ ○ /dashboard/analytics
+├ ○ /dashboard/audiences
+├ ƒ /dashboard/audiences/[id]
+├ ○ /dashboard/campaigns
+├ ƒ /dashboard/campaigns/[id]
+├ ○ /dashboard/leads
+├ ƒ /dashboard/leads/[id]
+├ ○ /dashboard/sender-emails
+├ ○ /dashboard/sequences
+├ ƒ /dashboard/sequences/[id]
+├ ƒ /dashboard/sequences/[id]/edit
+├ ○ /dashboard/sequences/new
+└ ○ /dashboard/settings
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
