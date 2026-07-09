@@ -115,7 +115,13 @@ class CampaignService:
             if not variant:
                 variant = variants.get("a", {"title": "Untitled", "body": ""})
                 
-            raw_subject = variant.get("title", "Untitled")
+            # Pick subject line: new format stores a list, legacy stored a single string
+            subject_lines = variant.get("subject_lines", [])
+            if subject_lines:
+                raw_subject = subject_lines[0]
+            else:
+                # Backward compat: old sequences stored "title"
+                raw_subject = variant.get("title", "Untitled")
             rendered_subject = render_template(raw_subject, lead) if lead else raw_subject
             email = EmailTransaction(
                 PK=f"CAMPAIGN#{campaign['id']}",
@@ -326,8 +332,26 @@ class CampaignService:
                 # Fallback to variant a
                 variant = variants.get("a", {"title": "Untitled", "body": ""})
 
-            subject = variant.get("title", "Untitled")
-            body = variant.get("body", "")
+            # Pick subject line: new format stores a list, legacy stored a single string
+            subject_lines = variant.get("subject_lines", [])
+            if subject_lines:
+                subject = subject_lines[0]
+            else:
+                # Backward compat: old sequences stored "title"
+                subject = variant.get("title", "Untitled")
+
+            # Build the full email body: opening line + body + reply trigger
+            opening_lines = variant.get("opening_lines", [])
+            body_parts = []
+            if opening_lines:
+                body_parts.append(f"<p><strong>{opening_lines[0]}</strong></p>")
+            body_parts.append(variant.get("body", ""))
+            reply_trigger = variant.get("reply_trigger")
+            if reply_trigger:
+                body_parts.append(
+                    f'<p>Reply "<strong>{reply_trigger}</strong>" and I\'ll share more.</p>'
+                )
+            body = "\n".join(body_parts)
 
             # Render mail-merge templates
             rendered_subject = render_template(subject, lead)

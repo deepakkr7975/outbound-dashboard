@@ -108,8 +108,26 @@ class Audience(BaseModel):
     updated_at: str = Field(default_factory=current_time_iso)
 
 class Variant(BaseModel):
-    title: str
-    body: str
+    subject_lines: List[str] = Field(default_factory=list)  # 2 subject line options
+    opening_lines: List[str] = Field(default_factory=list)  # 2 opening hook options
+    body: str = ""
+    reply_trigger: Optional[str] = None                     # e.g. "SHOW ME", "HACK"
+
+    # ── Backward compatibility ───────────────────────────────────────
+    # Old sequences stored a single "title" string.  These helpers let
+    # existing code that reads variant["title"] / variant.title keep
+    # working while we migrate to subject_lines.
+
+    @property
+    def title(self) -> str:
+        """Return the first subject line, falling back to empty string."""
+        return self.subject_lines[0] if self.subject_lines else ""
+
+    def __init__(self, **data):
+        # Accept legacy {"title": "..."} payloads from DynamoDB
+        if "title" in data and "subject_lines" not in data:
+            data["subject_lines"] = [data.pop("title")]
+        super().__init__(**data)
 
 class VariantsMap(BaseModel):
     a: Variant
@@ -259,6 +277,45 @@ class UpdateSequenceRequest(BaseModel):
     total_steps: Optional[int] = None
     has_ab_testing: Optional[bool] = None
     steps: Optional[List[SequenceStepData]] = None
+
+# ── AI Sequence Generation ───────────────────────────────────────────────────
+
+class CTA(BaseModel):
+    text: str                        # e.g. "Book a 15-min demo"
+    url: Optional[str] = None        # clickable link, if any
+
+class GenerateSequenceRequest(BaseModel):
+    company: str                     # Company name or website
+    target_audience: str             # Type of audience
+    offer: str                       # What to sell to this audience
+    num_steps: int = Field(3, ge=1, le=10)          # Number of emails in sequence
+    body_char_limit: int = Field(600, ge=100, le=5000)  # Max characters in body text
+    cta: CTA                         # CTA text + optional clickable link
+    include_ab_testing: bool = False
+    personalization_vars: List[str] = Field(default_factory=lambda: ["name", "company"])
+    tone: str = Field(
+        "professional",
+        description="Writing style: professional, clickbait, casual, or formal",
+    )
+
+class RefineSequenceRequest(BaseModel):
+    """Take an existing draft sequence and revise it with a free-text instruction."""
+    steps: List[SequenceStepData]
+    instruction: str                 # e.g. "make it shorter and less salesy"
+    body_char_limit: int = Field(600, ge=100, le=5000)
+    personalization_vars: List[str] = Field(default_factory=lambda: ["name", "company"])
+    tone: str = Field(
+        "professional",
+        description="Writing style: professional, clickbait, casual, or formal",
+    )
+
+class RegenerateStepRequest(BaseModel):
+    """Regenerate a single step of an existing sequence."""
+    step_order: int
+    instruction: Optional[str] = None
+    include_ab_testing: bool = False
+    body_char_limit: int = Field(600, ge=100, le=5000)
+    personalization_vars: List[str] = Field(default_factory=lambda: ["name", "company"])
 
 # Campaign
 class CreateCampaignRequest(BaseModel):
