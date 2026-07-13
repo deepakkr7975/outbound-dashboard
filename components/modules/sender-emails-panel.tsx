@@ -7,7 +7,10 @@ import { SenderEmailPreviewSheet } from "@/components/modules/sender-email-previ
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog"
 import { FilterBar } from "@/components/dashboard/filter-bar"
 import { SortableTableHead } from "@/components/dashboard/sortable-table-head"
-import { LinkedStatusBadge } from "@/components/dashboard/status-badge"
+import {
+  LinkedStatusBadge,
+  VerificationBadge,
+} from "@/components/dashboard/status-badge"
 import { PageHeader } from "@/components/dashboard/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -36,19 +39,45 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
+import { useLiveData } from "@/hooks/use-live-data"
 import { useTableSort } from "@/hooks/use-table-sort"
 import { useUrlPreview } from "@/hooks/use-url-preview"
+import {
+  connectSenderEmail,
+  createSenderEmail,
+  deleteSenderEmail,
+  updateSenderSignature,
+} from "@/lib/api"
 import { senderEmails as initialData } from "@/lib/data/sender-emails"
+import { refresh } from "@/lib/data/store"
 import { campaigns } from "@/lib/data/campaigns"
 import { formatDate } from "@/lib/format"
 import type { SenderEmail } from "@/lib/types"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { MoreVerticalCircle01Icon } from "@hugeicons/core-free-icons"
 
+/** Mirror the backend's `extract_domain_info` so the Add dialog can preview
+ * the domain/domain name that will be derived from the email on the server. */
+function deriveDomainInfo(email: string) {
+  const at = email.indexOf("@")
+  if (at === -1) return null
+  const domain = email.slice(at + 1).toLowerCase().trim()
+  if (!domain) return null
+  const domain_name = domain
+    .split(".")[0]
+    .replace(/-/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ")
+  return { domain, domain_name }
+}
+
 type SenderSortColumn =
   | "email"
   | "domain"
   | "domain_name"
+  | "verification"
   | "status"
   | "linked_campaigns"
   | "signature"
@@ -56,11 +85,41 @@ type SenderSortColumn =
 
 export function SenderEmailsPanel() {
   const { previewId, setPreviewId } = useUrlPreview()
+  const { version } = useLiveData()
   const [data, setData] = React.useState(initialData)
+
+  React.useEffect(() => {
+    setData([...initialData])
+  }, [version])
+
+  // The Gmail OAuth callback redirects back here with ?connected=<email> (or
+  // ?connect_error=<msg>). Surface the result, refresh so the newly-verified
+  // account shows, and strip the param so a reload doesn't re-toast.
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const connected = params.get("connected")
+    const connectError = params.get("connect_error")
+    if (!connected && !connectError) return
+    if (connected) {
+      toast.success(`${decodeURIComponent(connected)} connected`)
+      refresh()
+    } else if (connectError) {
+      toast.error(`Gmail connect failed: ${decodeURIComponent(connectError)}`)
+    }
+    params.delete("connected")
+    params.delete("connect_error")
+    const qs = params.toString()
+    window.history.replaceState(
+      null,
+      "",
+      window.location.pathname + (qs ? `?${qs}` : "")
+    )
+  }, [])
   const [previewSender, setPreviewSender] = React.useState<SenderEmail | null>(null)
   const [previewOpen, setPreviewOpen] = React.useState(false)
   const [search, setSearch] = React.useState("")
   const [statusFilter, setStatusFilter] = React.useState("all")
+  const [verificationFilter, setVerificationFilter] = React.useState("all")
   const [signatureFilter, setSignatureFilter] = React.useState("all")
   const [domainFilter, setDomainFilter] = React.useState("all")
   const { column: sortColumn, direction: sortDirection, toggle: toggleSort, sort } =
@@ -71,10 +130,9 @@ export function SenderEmailsPanel() {
   const [selected, setSelected] = React.useState<SenderEmail | null>(null)
   const [form, setForm] = React.useState({
     email: "",
-    domain: "revtrix.in",
-    domain_name: "revtrix",
     signature: "",
   })
+  const derivedDomain = deriveDomainInfo(form.email)
 
   const domains = Array.from(new Set(data.map((row) => row.domain)))
 
@@ -86,17 +144,27 @@ export function SenderEmailsPanel() {
         row.domain.toLowerCase().includes(search.toLowerCase())
       const matchesStatus =
         statusFilter === "all" || row.linked_status === statusFilter
+      const matchesVerification =
+        verificationFilter === "all" ||
+        row.verification_status === verificationFilter
       const matchesSignature =
         signatureFilter === "all" ||
         (signatureFilter === "set" ? !!row.signature : !row.signature)
       const matchesDomain =
         domainFilter === "all" || row.domain === domainFilter
-      return matchesSearch && matchesStatus && matchesSignature && matchesDomain
+      return (
+        matchesSearch &&
+        matchesStatus &&
+        matchesVerification &&
+        matchesSignature &&
+        matchesDomain
+      )
     }),
     {
       email: (row) => row.email,
       domain: (row) => row.domain,
       domain_name: (row) => row.domain_name,
+      verification: (row) => (row.verification_status === "verified" ? 1 : 0),
       status: (row) => row.linked_status,
       linked_campaigns: (row) => row.linked_campaign_ids.length,
       signature: (row) => (row.signature ? 1 : 0),
@@ -107,6 +175,7 @@ export function SenderEmailsPanel() {
   const activeFilterCount = [
     !!search,
     statusFilter !== "all",
+    verificationFilter !== "all",
     signatureFilter !== "all",
     domainFilter !== "all",
   ].filter(Boolean).length
@@ -114,6 +183,7 @@ export function SenderEmailsPanel() {
   function clearFilters() {
     setSearch("")
     setStatusFilter("all")
+    setVerificationFilter("all")
     setSignatureFilter("all")
     setDomainFilter("all")
   }
@@ -145,55 +215,81 @@ export function SenderEmailsPanel() {
     if (!open) setPreviewId(null)
   }
 
-  function handleAdd() {
+  async function handleAdd() {
     if (!form.email.includes("@")) {
       toast.error("Enter a valid email address")
       return
     }
-    const newEmail: SenderEmail = {
-      id: `snd_${Date.now()}`,
-      email: form.email,
-      domain: form.domain,
-      domain_name: form.domain_name,
-      signature: form.signature || null,
-      linked_status: "free",
-      linked_campaign_ids: [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+    try {
+      const created = await createSenderEmail(form.email)
+      if (form.signature) {
+        await updateSenderSignature(created.id, {
+          signature_html: form.signature,
+        })
+      }
+      await refresh()
+      setAddOpen(false)
+      setForm({ email: "", signature: "" })
+      toast.success("Sender email added")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Add failed")
     }
-    setData((prev) => [newEmail, ...prev])
-    setAddOpen(false)
-    setForm({ email: "", domain: "revtrix.in", domain_name: "revtrix", signature: "" })
-    toast.success("Sender email added")
   }
 
-  function handleSaveSignature() {
+  async function handleSaveSignature() {
     if (!selected) return
-    setData((prev) =>
-      prev.map((row) =>
-        row.id === selected.id
-          ? {
-              ...row,
-              signature: form.signature || null,
-              updated_at: new Date().toISOString(),
-            }
-          : row
+    try {
+      await updateSenderSignature(selected.id, {
+        signature_html: form.signature,
+      })
+      setData((prev) =>
+        prev.map((row) =>
+          row.id === selected.id
+            ? {
+                ...row,
+                signature: form.signature || null,
+                updated_at: new Date().toISOString(),
+              }
+            : row
+        )
       )
-    )
-    setSignatureOpen(false)
-    toast.success("Signature updated")
+      setSignatureOpen(false)
+      toast.success("Signature updated")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Update failed")
+    }
   }
 
-  function handleDelete() {
+  async function handleConnect(sender: SenderEmail) {
+    try {
+      const { authorization_url } = await connectSenderEmail()
+      // Pre-select this mailbox in the Google account chooser so the callback
+      // (which matches by email) verifies this exact row.
+      const url = new URL(authorization_url)
+      url.searchParams.set("login_hint", sender.email)
+      window.location.href = url.toString()
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not start Gmail connect"
+      )
+    }
+  }
+
+  async function handleDelete() {
     if (!selected) return
     if (selected.linked_status === "linked") {
       toast.error(
-        `Unlink from campaign(s) ${getCampaignNames(selected.linked_campaign_ids)} before deleting.`
+        `In use by active campaign(s): ${getCampaignNames(selected.linked_campaign_ids)}. Cancel or pause them first, then delete.`
       )
       return
     }
-    setData((prev) => prev.filter((row) => row.id !== selected.id))
-    toast.success("Sender email deleted")
+    try {
+      await deleteSenderEmail(selected.id)
+      setData((prev) => prev.filter((row) => row.id !== selected.id))
+      toast.success("Sender email deleted")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Delete failed")
+    }
   }
 
   return (
@@ -223,6 +319,17 @@ export function SenderEmailsPanel() {
               { label: "Linked", value: "linked" },
             ],
             onChange: setStatusFilter,
+          },
+          {
+            id: "verification",
+            label: "Verification",
+            value: verificationFilter,
+            options: [
+              { label: "All", value: "all" },
+              { label: "Verified", value: "verified" },
+              { label: "Not verified", value: "pending_verification" },
+            ],
+            onChange: setVerificationFilter,
           },
           {
             id: "signature",
@@ -277,6 +384,14 @@ export function SenderEmailsPanel() {
                   Domain Name
                 </SortableTableHead>
                 <SortableTableHead
+                  column="verification"
+                  sortColumn={sortColumn}
+                  sortDirection={sortDirection}
+                  onSort={toggleSort}
+                >
+                  Verification
+                </SortableTableHead>
+                <SortableTableHead
                   column="status"
                   sortColumn={sortColumn}
                   sortDirection={sortDirection}
@@ -322,6 +437,9 @@ export function SenderEmailsPanel() {
                   <TableCell>{row.domain}</TableCell>
                   <TableCell>{row.domain_name}</TableCell>
                   <TableCell>
+                    <VerificationBadge status={row.verification_status} />
+                  </TableCell>
+                  <TableCell>
                     <LinkedStatusBadge status={row.linked_status} />
                   </TableCell>
                   <TableCell>
@@ -353,6 +471,16 @@ export function SenderEmailsPanel() {
                         <HugeiconsIcon icon={MoreVerticalCircle01Icon} strokeWidth={2} />
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        {row.verification_status === "pending_verification" && (
+                          <>
+                            <DropdownMenuItem
+                              onClick={() => handleConnect(row)}
+                            >
+                              Verify with Gmail
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                          </>
+                        )}
                         <DropdownMenuItem
                           onClick={() => {
                             setSelected(row)
@@ -396,22 +524,15 @@ export function SenderEmailsPanel() {
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 placeholder="outreach@revtrix.in"
               />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="domain">Domain</Label>
-              <Input
-                id="domain"
-                value={form.domain}
-                onChange={(e) => setForm({ ...form, domain: e.target.value })}
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="domain_name">Domain Name</Label>
-              <Input
-                id="domain_name"
-                value={form.domain_name}
-                onChange={(e) => setForm({ ...form, domain_name: e.target.value })}
-              />
+              {derivedDomain && (
+                <p className="text-xs text-muted-foreground">
+                  Domain{" "}
+                  <span className="font-medium text-foreground">
+                    {derivedDomain.domain}
+                  </span>{" "}
+                  · {derivedDomain.domain_name}
+                </p>
+              )}
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="sig">Signature (optional)</Label>

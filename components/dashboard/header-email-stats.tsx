@@ -7,6 +7,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { useLiveData } from "@/hooks/use-live-data"
 import {
   formatCompactCount,
   getHeaderEmailStats,
@@ -19,9 +20,7 @@ import {
   SentIcon,
 } from "@hugeicons/core-free-icons"
 
-const stats = getHeaderEmailStats()
-
-const items = [
+const buildItems = (stats: ReturnType<typeof getHeaderEmailStats>) => [
   {
     key: "sent",
     label: "Emails sent",
@@ -46,9 +45,11 @@ const items = [
     tone: "text-emerald-400",
     badge: "bg-emerald-500/15 text-emerald-300",
   },
-] as const
+]
 
 export function HeaderEmailStats() {
+  useLiveData()
+  const items = buildItems(getHeaderEmailStats())
   return (
     <div className="hidden items-center gap-0.5 sm:flex">
       {items.map((item) => (

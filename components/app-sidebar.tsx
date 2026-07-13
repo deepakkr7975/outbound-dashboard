@@ -23,6 +23,7 @@ import {
   UserGroupIcon,
   Contact01Icon,
   LeftToRightListBulletIcon,
+  AiMagicIcon,
   Megaphone01Icon,
   Analytics01Icon,
   CommandIcon,
@@ -56,6 +57,11 @@ const navItems = [
     icon: LeftToRightListBulletIcon,
   },
   {
+    title: "AI Sequences",
+    url: "/dashboard/sequences/ai",
+    icon: AiMagicIcon,
+  },
+  {
     title: "Campaigns",
     url: "/dashboard/campaigns",
     icon: Megaphone01Icon,
@@ -75,7 +81,7 @@ const navItems = [
 const user = {
   name: "Alex Morgan",
   email: "alex@revtrix.in",
-  avatar: "/avatars/shadcn.jpg",
+  avatar: "/avatars/user.svg",
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -101,10 +107,31 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => {
-                const isActive =
+                // Highlight only the most specific matching item, so a sub-route
+                // like /dashboard/sequences/ai lights up "AI Sequences" and not
+                // also its parent "Sequences".
+                const matchLength =
                   item.url === "/dashboard"
                     ? pathname === "/dashboard"
-                    : pathname.startsWith(item.url)
+                      ? item.url.length
+                      : -1
+                    : pathname === item.url ||
+                        pathname.startsWith(`${item.url}/`)
+                      ? item.url.length
+                      : -1
+                const bestMatch = navItems.reduce((best, other) => {
+                  const len =
+                    other.url === "/dashboard"
+                      ? pathname === "/dashboard"
+                        ? other.url.length
+                        : -1
+                      : pathname === other.url ||
+                          pathname.startsWith(`${other.url}/`)
+                        ? other.url.length
+                        : -1
+                  return len > best ? len : best
+                }, -1)
+                const isActive = matchLength >= 0 && matchLength === bestMatch
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton

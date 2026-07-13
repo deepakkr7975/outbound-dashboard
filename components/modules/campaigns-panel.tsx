@@ -37,8 +37,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { useLiveData } from "@/hooks/use-live-data"
 import { useTableSort } from "@/hooks/use-table-sort"
 import { useUrlPreview } from "@/hooks/use-url-preview"
+import { cancelCampaign, deleteCampaign } from "@/lib/api"
+import { refresh } from "@/lib/data/store"
 import { campaigns as initialData } from "@/lib/data/campaigns"
 import { senderEmails } from "@/lib/data/sender-emails"
 import { audiences } from "@/lib/data/audiences"
@@ -62,7 +65,12 @@ type LinkedSortColumn = "campaign" | "email" | "domain" | "status"
 export function CampaignsPanel() {
   const router = useRouter()
   const { previewId } = useUrlPreview()
+  const { version } = useLiveData()
   const [data, setData] = React.useState(initialData)
+
+  React.useEffect(() => {
+    setData([...initialData])
+  }, [version])
   const [search, setSearch] = React.useState("")
   const [scheduledFilter, setScheduledFilter] = React.useState("all")
   const [completedFilter, setCompletedFilter] = React.useState("all")
@@ -192,18 +200,34 @@ export function CampaignsPanel() {
     router.push(`/dashboard/campaigns/${campaign.campaign_id}`)
   }
 
-  function handleDelete() {
+  async function handleCancel(campaign: Campaign) {
+    try {
+      await cancelCampaign(campaign.campaign_id)
+      // Refetch so this campaign's status and any freed sender emails update.
+      await refresh()
+      toast.success(`"${campaign.name}" cancelled`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Cancel failed")
+    }
+  }
+
+  async function handleDelete() {
     if (!selected) return
     if (selected.status === "scheduled" || selected.status === "sending") {
       toast.error(
-        "Cancel or complete scheduled sends before deleting."
+        "Cancel this campaign before deleting it."
       )
       return
     }
-    setData((prev) =>
-      prev.filter((row) => row.campaign_id !== selected.campaign_id)
-    )
-    toast.success("Campaign deleted")
+    try {
+      await deleteCampaign(selected.campaign_id)
+      setData((prev) =>
+        prev.filter((row) => row.campaign_id !== selected.campaign_id)
+      )
+      toast.success("Campaign deleted")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Delete failed")
+    }
   }
 
   const campaignTable = (
@@ -320,6 +344,13 @@ export function CampaignsPanel() {
                     >
                       View
                     </DropdownMenuItem>
+                    {(row.status === "scheduled" ||
+                      row.status === "sending" ||
+                      row.status === "paused") && (
+                      <DropdownMenuItem onClick={() => handleCancel(row)}>
+                        Cancel sending
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       variant="destructive"

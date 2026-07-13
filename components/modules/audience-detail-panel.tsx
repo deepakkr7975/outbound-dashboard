@@ -7,6 +7,8 @@ import { toast } from "sonner"
 
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog"
 import { DetailRow } from "@/components/dashboard/detail-row"
+import { useLiveData } from "@/hooks/use-live-data"
+import { updateAudience } from "@/lib/api"
 import { getAudienceById } from "@/lib/data/audiences"
 import { campaigns } from "@/lib/data/campaigns"
 import { getLeadsByAudience } from "@/lib/data/leads"
@@ -50,10 +52,15 @@ import {
 
 export function AudienceDetailPanel({ audienceId }: { audienceId: string }) {
   const router = useRouter()
+  const { ready, version } = useLiveData()
   const audience = getAudienceById(audienceId)
   const [leads, setLeads] = React.useState<Lead[]>(
     () => getLeadsByAudience(audienceId)
   )
+
+  React.useEffect(() => {
+    setLeads(getLeadsByAudience(audienceId))
+  }, [audienceId, version])
   const [search, setSearch] = React.useState("")
   const [selected, setSelected] = React.useState<Set<string>>(new Set())
   const [removeOpen, setRemoveOpen] = React.useState(false)
@@ -63,6 +70,18 @@ export function AudienceDetailPanel({ audienceId }: { audienceId: string }) {
     description: audience?.description ?? "",
     tags: audience?.tags.join(", ") ?? "",
   })
+
+  const audienceName = audience?.name
+  React.useEffect(() => {
+    const current = getAudienceById(audienceId)
+    if (current) {
+      setMeta({
+        name: current.name,
+        description: current.description,
+        tags: current.tags.join(", "),
+      })
+    }
+  }, [audienceId, audienceName, version])
 
   const linkedCampaigns = campaigns.filter((c) => c.audience_id === audienceId)
   const contacted = leads.filter((l) => l.emails_sent > 0).length
@@ -94,12 +113,40 @@ export function AudienceDetailPanel({ audienceId }: { audienceId: string }) {
     toast.success(`Removed ${count} lead${count === 1 ? "" : "s"}`)
   }
 
-  function handleSaveMeta() {
-    toast.success("Audience updated")
-    setEditOpen(false)
+  async function handleSaveMeta() {
+    try {
+      await updateAudience(audienceId, {
+        name: meta.name,
+        description: meta.description,
+        tags: meta.tags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
+      })
+      const current = getAudienceById(audienceId)
+      if (current) {
+        current.name = meta.name
+        current.description = meta.description
+        current.tags = meta.tags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean)
+      }
+      toast.success("Audience updated")
+      setEditOpen(false)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Update failed")
+    }
   }
 
   if (!audience) {
+    if (!ready) {
+      return (
+        <div className="flex flex-col items-center gap-4 py-16">
+          <p className="text-muted-foreground">Loading…</p>
+        </div>
+      )
+    }
     return (
       <div className="flex flex-col items-center gap-4 py-16">
         <p className="text-muted-foreground">Audience not found</p>

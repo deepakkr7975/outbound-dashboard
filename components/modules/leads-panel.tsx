@@ -18,6 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useExports } from "@/hooks/use-exports"
+import { useLiveData } from "@/hooks/use-live-data"
 import { useTableSort } from "@/hooks/use-table-sort"
 import { buildLeadsExport } from "@/lib/exports/builders"
 import { audiences } from "@/lib/data/audiences"
@@ -42,6 +43,7 @@ export function LeadsPanel() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { addExport } = useExports()
+  const { version } = useLiveData()
 
   const audienceFilter = searchParams.get("audience") ?? "all"
   const campaignFilter = searchParams.get("campaign") ?? "all"
@@ -62,7 +64,7 @@ export function LeadsPanel() {
     if (leadParam && getLeadById(leadParam)) {
       router.replace(`/dashboard/leads/${leadParam}`)
     }
-  }, [leadParam, router])
+  }, [leadParam, router, version])
 
   function updateParams(updates: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams.toString())

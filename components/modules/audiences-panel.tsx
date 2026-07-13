@@ -35,9 +35,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { useLiveData } from "@/hooks/use-live-data"
 import { useTableSort } from "@/hooks/use-table-sort"
 import { useUrlPreview } from "@/hooks/use-url-preview"
+import { deleteAudience, uploadLeadsCsv } from "@/lib/api"
 import { audiences as initialData, getAudienceById } from "@/lib/data/audiences"
+import { refresh } from "@/lib/data/store"
 import { campaigns } from "@/lib/data/campaigns"
 import { formatDate } from "@/lib/format"
 import type { Audience } from "@/lib/types"
@@ -55,8 +58,13 @@ type AudienceSortColumn =
 export function AudiencesPanel() {
   const router = useRouter()
   const { previewId } = useUrlPreview()
+  const { version } = useLiveData()
   const [data, setData] = React.useState(initialData)
   const [search, setSearch] = React.useState("")
+
+  React.useEffect(() => {
+    setData([...initialData])
+  }, [version])
   const [tagFilter, setTagFilter] = React.useState("all")
   const [membersFilter, setMembersFilter] = React.useState("all")
   const { column: sortColumn, direction: sortDirection, toggle: toggleSort, sort } =
@@ -70,6 +78,8 @@ export function AudiencesPanel() {
     tags: "",
     fileName: "",
   })
+  const [csvFile, setCsvFile] = React.useState<File | null>(null)
+  const [uploading, setUploading] = React.useState(false)
 
   const allTags = Array.from(new Set(data.flatMap((a) => a.tags)))
 
@@ -118,34 +128,41 @@ export function AudiencesPanel() {
     router.push(`/dashboard/audiences/${audience.id}`)
   }
 
-  function handleAdd() {
-    if (!form.name || !form.fileName) {
+  async function handleAdd() {
+    if (!form.name || !csvFile) {
       toast.error("Name and CSV file are required")
       return
     }
-    const newAudience: Audience = {
-      id: crypto.randomUUID(),
-      name: form.name,
-      description: form.description,
-      file_name: form.fileName,
-      tags: form.tags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean),
-      member_count: Math.floor(Math.random() * 200) + 50,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+    const body = new FormData()
+    body.append("name", form.name)
+    if (form.description) body.append("description", form.description)
+    if (form.tags) body.append("tags", form.tags)
+    body.append("file", csvFile)
+    setUploading(true)
+    try {
+      const result = (await uploadLeadsCsv(body)) as {
+        audience?: { id: string; name: string; num_leads: number }
+      }
+      await refresh()
+      setAddOpen(false)
+      setForm({ name: "", description: "", tags: "", fileName: "" })
+      setCsvFile(null)
+      toast.success(
+        `Audience "${result.audience?.name ?? form.name}" created with ${
+          result.audience?.num_leads ?? 0
+        } leads`
+      )
+      if (result.audience?.id) {
+        router.push(`/dashboard/audiences/${result.audience.id}`)
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Upload failed")
+    } finally {
+      setUploading(false)
     }
-    setData((prev) => [newAudience, ...prev])
-    setAddOpen(false)
-    setForm({ name: "", description: "", tags: "", fileName: "" })
-    toast.success(
-      `Audience "${newAudience.name}" created with ${newAudience.member_count} leads`
-    )
-    router.push(`/dashboard/audiences/${newAudience.id}`)
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!selected) return
     const inUse = campaigns.some(
       (c) =>
@@ -156,8 +173,13 @@ export function AudiencesPanel() {
       toast.error("Cannot delete — audience is attached to a running campaign")
       return
     }
-    setData((prev) => prev.filter((row) => row.id !== selected.id))
-    toast.success("Audience deleted")
+    try {
+      await deleteAudience(selected.id)
+      setData((prev) => prev.filter((row) => row.id !== selected.id))
+      toast.success("Audience deleted")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Delete failed")
+    }
   }
 
   return (
@@ -362,12 +384,11 @@ export function AudiencesPanel() {
                 id="csv"
                 type="file"
                 accept=".csv"
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    fileName: e.target.files?.[0]?.name ?? "",
-                  })
-                }
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null
+                  setCsvFile(file)
+                  setForm({ ...form, fileName: file?.name ?? "" })
+                }}
               />
             </div>
           </div>
@@ -375,7 +396,9 @@ export function AudiencesPanel() {
             <Button variant="outline" onClick={() => setAddOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAdd}>Import Audience</Button>
+            <Button onClick={handleAdd} disabled={uploading}>
+              {uploading ? "Uploading…" : "Import Audience"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

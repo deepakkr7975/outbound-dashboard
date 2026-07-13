@@ -1,0 +1,7 @@
+.env
+__pycache__/
+*.pyc
+venv/
+.DS_Store
+research_lab_service_key.json
+.claude

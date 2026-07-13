@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation"
 
 import { CampaignStatusBadge } from "@/components/dashboard/status-badge"
+import { useLiveData } from "@/hooks/use-live-data"
 import { campaigns, transactions } from "@/lib/data"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -16,6 +17,7 @@ import {
 
 export function DashboardOverviewTables() {
   const router = useRouter()
+  useLiveData()
   const recentCampaigns = campaigns.slice(0, 3)
   const recentTxns = transactions.slice(0, 5)
 

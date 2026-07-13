@@ -4,6 +4,7 @@ import Link from "next/link"
 
 import { CampaignStatusBadge } from "@/components/dashboard/status-badge"
 import { DetailRow } from "@/components/dashboard/detail-row"
+import { useLiveData } from "@/hooks/use-live-data"
 import { audiences } from "@/lib/data/audiences"
 import { getCampaignById } from "@/lib/data/campaigns"
 import { sequences } from "@/lib/data/sequences"
@@ -27,9 +28,17 @@ import {
 } from "@hugeicons/core-free-icons"
 
 export function CampaignDetailPanel({ campaignId }: { campaignId: string }) {
+  const { ready } = useLiveData()
   const campaign = getCampaignById(campaignId)
 
   if (!campaign) {
+    if (!ready) {
+      return (
+        <div className="flex flex-col items-center gap-4 py-16">
+          <p className="text-muted-foreground">Loading…</p>
+        </div>
+      )
+    }
     return (
       <div className="flex flex-col items-center gap-4 py-16">
         <p className="text-muted-foreground">Campaign not found</p>

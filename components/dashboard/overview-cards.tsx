@@ -1,3 +1,5 @@
+"use client"
+
 import Link from "next/link"
 
 import { Badge } from "@/components/ui/badge"
@@ -9,19 +11,21 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { useLiveData } from "@/hooks/use-live-data"
 import { campaigns, transactions } from "@/lib/data"
 import { formatPercent } from "@/lib/format"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { ChartUpIcon, Mail01Icon, Message01Icon, Megaphone01Icon } from "@hugeicons/core-free-icons"
 
-const totalSent = transactions.filter((t) => t.sent_at).length
-const totalOpened = transactions.filter((t) => t.opened_at).length
-const totalReplied = transactions.filter((t) => t.replied_at).length
-const activeCampaigns = campaigns.filter(
-  (c) => c.status === "sending" || c.status === "scheduled"
-).length
+const buildCards = () => {
+  const totalSent = transactions.filter((t) => t.sent_at).length
+  const totalOpened = transactions.filter((t) => t.opened_at).length
+  const totalReplied = transactions.filter((t) => t.replied_at).length
+  const activeCampaigns = campaigns.filter(
+    (c) => c.status === "sending" || c.status === "scheduled"
+  ).length
 
-const cards = [
+  return [
   {
     label: "Total Sends",
     value: totalSent.toLocaleString(),
@@ -62,9 +66,12 @@ const cards = [
     trend: "up" as const,
     href: "/dashboard/campaigns",
   },
-]
+  ]
+}
 
 export function OverviewCards() {
+  useLiveData()
+  const cards = buildCards()
   return (
     <div className="grid grid-cols-1 gap-4 px-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs lg:px-6 @xl/main:grid-cols-2 @5xl/main:grid-cols-4 dark:*:data-[slot=card]:bg-card">
       {cards.map((card) => (

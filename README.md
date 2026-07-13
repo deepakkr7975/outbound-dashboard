@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Outbound Dashboard
+
+Single source of truth for the email-automation app. This one project contains
+**both** the frontend and the backend:
+
+```
+outbound-dashboard/
+├── app/ components/ lib/ hooks/   # Next.js frontend (App Router)
+└── fastapi-backend/               # FastAPI backend (campaigns, sequences,
+                                   #   AI sequences, leads, tracking) on DynamoDB
+```
+
+The frontend talks to the backend over HTTP (`NEXT_PUBLIC_API_URL`, default
+`http://127.0.0.1:8000`) — see [lib/api.ts](lib/api.ts). It does not import
+backend code directly.
 
 ## Getting Started
 
-First, run the development server:
+### 1. Backend (`fastapi-backend/`)
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd fastapi-backend
+python3 -m venv venv
+./venv/bin/python -m pip install -r requirements.txt
+
+# Configure secrets (AWS, Google OAuth, GEMINI_API_KEY, …)
+cp .env.example .env   # then edit .env
+
+# Run on http://127.0.0.1:8000
+./venv/bin/python -m uvicorn app.main:app --reload --port 8000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`.env`, `venv/`, and `research_lab_service_key.json` are git-ignored — they hold
+secrets / environment-specific state and must not be committed.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 2. Frontend
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+# from the repo root (outbound-dashboard/)
+npm install
+npm run dev            # http://localhost:3000
+```
 
-## Learn More
+`.env.local` sets `NEXT_PUBLIC_API_URL=http://127.0.0.1:8000`. Point it at a
+deployed backend URL for staging/production.
 
-To learn more about Next.js, take a look at the following resources:
+## Backend API surface (selected)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `GET /email-accounts`, `GET /leads`, `GET /audiences`, `GET /sequences`,
+  `GET /campaigns`, `GET /transactions` — data the dashboard hydrates from.
+- `/ai/sequences/*` — Gemini-powered sequence generation, refine, regenerate-step
+  (requires `GEMINI_API_KEY`).
+- `/debug/database` — dumps every DynamoDB table (secrets redacted) for the
+  `/dashboard`-adjacent `/test-database` page.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+CORS allows `localhost:3000/3001` by default; override with the `CORS_ORIGINS`
+env var (comma-separated) for other origins.
 
-## Deploy on Vercel
+## Notes
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- The backend was previously maintained as a separate `Email-Automation`
+  project. It now lives here in `fastapi-backend/` as the single source of truth.
+- Built with [Next.js](https://nextjs.org) (App Router) and
+  [FastAPI](https://fastapi.tiangolo.com).

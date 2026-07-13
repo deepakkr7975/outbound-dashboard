@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { ConfirmDialog } from "@/components/dashboard/confirm-dialog"
@@ -26,15 +27,21 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useExports } from "@/hooks/use-exports"
+import { useLiveData } from "@/hooks/use-live-data"
 import { useTableSort } from "@/hooks/use-table-sort"
 import { buildSequencesExport } from "@/lib/exports/builders"
 import { useUrlPreview } from "@/hooks/use-url-preview"
+import { deleteSequence } from "@/lib/api"
+import { refresh } from "@/lib/data/store"
 import { sequences as initialData } from "@/lib/data/sequences"
 import { campaigns } from "@/lib/data/campaigns"
 import { formatDate } from "@/lib/format"
 import type { Sequence } from "@/lib/types"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { MoreVerticalCircle01Icon } from "@hugeicons/core-free-icons"
+import {
+  MoreVerticalCircle01Icon,
+  AiMagicIcon,
+} from "@hugeicons/core-free-icons"
 
 type SequenceSortColumn =
   | "name"
@@ -50,7 +57,12 @@ export function SequencesPanel() {
   const router = useRouter()
   const { previewId } = useUrlPreview()
   const { addExport } = useExports()
+  const { version } = useLiveData()
   const [data, setData] = React.useState(initialData)
+
+  React.useEffect(() => {
+    setData([...initialData])
+  }, [version])
   const [search, setSearch] = React.useState("")
   const [scheduledFilter, setScheduledFilter] = React.useState("all")
   const [completedFilter, setCompletedFilter] = React.useState("all")
@@ -128,23 +140,33 @@ export function SequencesPanel() {
     router.push(`/dashboard/sequences/${sequence.sequence_id}`)
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     if (!selected) return
+    // Match the backend: only running/sending, completed, or paused campaigns
+    // block deletion. Draft/scheduled campaigns are auto-cancelled server-side,
+    // so we must NOT block on them here.
     const blocking = campaigns.filter(
       (c) =>
         c.sequence_id === selected.sequence_id &&
-        (c.status === "scheduled" || c.status === "sending" || c.status === "completed")
+        (c.status === "sending" ||
+          c.status === "completed" ||
+          c.status === "paused")
     )
     if (blocking.length > 0) {
       toast.error(
-        `Cannot delete — linked to campaigns: ${blocking.map((c) => c.name).join(", ")}`
+        `In use by campaign(s): ${blocking.map((c) => c.name).join(", ")}. Cancel or finish them first.`
       )
       return
     }
-    setData((prev) =>
-      prev.filter((row) => row.sequence_id !== selected.sequence_id)
-    )
-    toast.success("Sequence deleted")
+    try {
+      await deleteSequence(selected.sequence_id)
+      // Refetch: deleting may have auto-cancelled draft/scheduled campaigns
+      // that reference this sequence, and those statuses must update in the UI.
+      await refresh()
+      toast.success("Sequence deleted")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Delete failed")
+    }
   }
 
   return (
@@ -152,7 +174,18 @@ export function SequencesPanel() {
       <PageHeader
         title="Sequences"
         description="Build multi-step email sequences with optional A/B testing"
-        actions={<ExportButton onClick={handleExport} />}
+        actions={
+          <>
+            <ExportButton onClick={handleExport} />
+            <Button
+              variant="outline"
+              render={<Link href="/dashboard/sequences/ai" />}
+            >
+              <HugeiconsIcon icon={AiMagicIcon} strokeWidth={2} />
+              Generate with AI
+            </Button>
+          </>
+        }
         action={{ label: "New Sequence", href: "/dashboard/sequences/new" }}
       />
       <FilterBar

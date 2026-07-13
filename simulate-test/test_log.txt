@@ -1,0 +1,196 @@
+[2026-07-07 01:01:17] ====================================================================================================
+[2026-07-07 01:01:17] Simulation test run started | base=http://localhost:3001 | api=http://127.0.0.1:8000
+[2026-07-07 01:01:59] TEST 01 dashboard-overview       | http://localhost:3001/dashboard | FAIL | Message: expected text not found: 'Winter Collection Launch' | screenshot=ss/01_dashboard-overview.png
+[2026-07-07 01:02:24] TEST 02 leads                    | http://localhost:3001/dashboard/leads | FAIL | Message: expected text not found: 'Emma Davis' | screenshot=ss/02_leads.png
+[2026-07-07 01:02:51] TEST 03 lead-detail              | http://localhost:3001/dashboard/leads/b5c88bf3-6349-4af7-9966-63c05c0519f7 | FAIL | Message: expected text not found: 'Emma Davis' | screenshot=ss/03_lead-detail.png
+[2026-07-07 01:03:16] TEST 04 audiences                | http://localhost:3001/dashboard/audiences | FAIL | Message: expected text not found: 'Internship' | screenshot=ss/04_audiences.png
+[2026-07-07 01:03:42] TEST 05 audience-detail          | http://localhost:3001/dashboard/audiences/7ab28193-e04a-4565-adb0-f7dc5ebf050d | FAIL | Message: expected text not found: 'Internship' | screenshot=ss/05_audience-detail.png
+[2026-07-07 01:04:08] TEST 06 campaigns                | http://localhost:3001/dashboard/campaigns | FAIL | Message: expected text not found: 'Winter Collection Launch' | screenshot=ss/06_campaigns.png
+[2026-07-07 01:04:34] TEST 07 campaign-detail          | http://localhost:3001/dashboard/campaigns/camp_winter | FAIL | Message: expected text not found: 'Winter Collection Launch' | screenshot=ss/07_campaign-detail.png
+[2026-07-07 01:05:00] TEST 08 sequences                | http://localhost:3001/dashboard/sequences | FAIL | Message: expected text not found: 'Winter Outreach' | screenshot=ss/08_sequences.png
+[2026-07-07 01:05:26] TEST 09 sequence-detail          | http://localhost:3001/dashboard/sequences/seq_winter | FAIL | Message: expected text not found: 'Winter Outreach' (screenshot failed: Message: no such window: target window already closed
+from unknown error: web view not found
+  (Session info: chrome=149.0.7827.201)
+Stacktrace:
+	chromedriver!GetHandleVerifier [0x7ff7e52e3fa5+14925]
+	chromedriver!GetHandleVerifier [0x7ff7e52e4000+14980]
+	chromedriver!(No symbol) [0x7ff7e4e2793d]
+	chromedriver!(No symbol) [0x7ff7e4dfe362]
+	chromedriver!(No symbol) [0x7ff7e4eb1846]
+	chromedriver!(No symbol) [0x7ff7e4ecec82]
+	chromedriver!(No symbol) [0x7ff7e4e7401c]
+	chromedriver!(No symbol) [0x7ff7e4e74f43]
+	chromedriver!GetHandleVerifier [0x7ff7e58c7591+5f7f11]
+	chromedriver!GetHandleVerifier [0x7ff7e58c1902+5f2282]
+	chromedriver!GetHandleVerifier [0x7ff7e58e7115+617a95]
+	chromedriver!GetHandleVerifier [0x7ff7e5301dce+3274e]
+	chromedriver!GetHandleVerifier [0x7ff7e530a82c+3b1ac]
+	chromedriver!GetHandleVerifier [0x7ff7e52ed744+1e0c4]
+	chromedriver!GetHandleVerifier [0x7ff7e52ed8d4+1e254]
+	chromedriver!GetHandleVerifier [0x7ff7e52d1447+1dc7]
+	KERNEL32!BaseThreadInitThunk [0x7ff82857e957+17]
+	ntdll!RtlUserThreadStart [0x7ff829307c1c+2c]
+) | screenshot=ss/09_sequence-detail.png
+[2026-07-07 01:05:26] TEST 10 sequence-builder-new     | http://localhost:3001/dashboard/sequences/new | FAIL | Message: no such window: target window already closed (screenshot failed: Message: no such window: target window already closed
+from unknown error: web view not found
+  (Session info: chrome=149.0.7827.201)
+Stacktrace:
+	chromedriver!GetHandleVerifier [0x7ff7e52e3fa5+14925]
+	chromedriver!GetHandleVerifier [0x7ff7e52e4000+14980]
+	chromedriver!(No symbol) [0x7ff7e4e2793d]
+	chromedriver!(No symbol) [0x7ff7e4dfe362]
+	chromedriver!(No symbol) [0x7ff7e4eb1846]
+	chromedriver!(No symbol) [0x7ff7e4ecec82]
+	chromedriver!(No symbol) [0x7ff7e4e7401c]
+	chromedriver!(No symbol) [0x7ff7e4e74f43]
+	chromedriver!GetHandleVerifier [0x7ff7e58c7591+5f7f11]
+	chromedriver!GetHandleVerifier [0x7ff7e58c1902+5f2282]
+	chromedriver!GetHandleVerifier [0x7ff7e58e7115+617a95]
+	chromedriver!GetHandleVerifier [0x7ff7e5301dce+3274e]
+	chromedriver!GetHandleVerifier [0x7ff7e530a82c+3b1ac]
+	chromedriver!GetHandleVerifier [0x7ff7e52ed744+1e0c4]
+	chromedriver!GetHandleVerifier [0x7ff7e52ed8d4+1e254]
+	chromedriver!GetHandleVerifier [0x7ff7e52d1447+1dc7]
+	KERNEL32!BaseThreadInitThunk [0x7ff82857e957+17]
+	ntdll!RtlUserThreadStart [0x7ff829307c1c+2c]
+) | screenshot=ss/10_sequence-builder-new.png
+[2026-07-07 01:05:26] TEST 11 sender-emails            | http://localhost:3001/dashboard/sender-emails | FAIL | Message: no such window: target window already closed (screenshot failed: Message: no such window: target window already closed
+from unknown error: web view not found
+  (Session info: chrome=149.0.7827.201)
+Stacktrace:
+	chromedriver!GetHandleVerifier [0x7ff7e52e3fa5+14925]
+	chromedriver!GetHandleVerifier [0x7ff7e52e4000+14980]
+	chromedriver!(No symbol) [0x7ff7e4e2793d]
+	chromedriver!(No symbol) [0x7ff7e4dfe362]
+	chromedriver!(No symbol) [0x7ff7e4eb1846]
+	chromedriver!(No symbol) [0x7ff7e4ecec82]
+	chromedriver!(No symbol) [0x7ff7e4e7401c]
+	chromedriver!(No symbol) [0x7ff7e4e74f43]
+	chromedriver!GetHandleVerifier [0x7ff7e58c7591+5f7f11]
+	chromedriver!GetHandleVerifier [0x7ff7e58c1902+5f2282]
+	chromedriver!GetHandleVerifier [0x7ff7e58e7115+617a95]
+	chromedriver!GetHandleVerifier [0x7ff7e5301dce+3274e]
+	chromedriver!GetHandleVerifier [0x7ff7e530a82c+3b1ac]
+	chromedriver!GetHandleVerifier [0x7ff7e52ed744+1e0c4]
+	chromedriver!GetHandleVerifier [0x7ff7e52ed8d4+1e254]
+	chromedriver!GetHandleVerifier [0x7ff7e52d1447+1dc7]
+	KERNEL32!BaseThreadInitThunk [0x7ff82857e957+17]
+	ntdll!RtlUserThreadStart [0x7ff829307c1c+2c]
+) | screenshot=ss/11_sender-emails.png
+[2026-07-07 01:05:26] TEST 12 analytics                | http://localhost:3001/dashboard/analytics | FAIL | Message: no such window: target window already closed (screenshot failed: Message: no such window: target window already closed
+from unknown error: web view not found
+  (Session info: chrome=149.0.7827.201)
+Stacktrace:
+	chromedriver!GetHandleVerifier [0x7ff7e52e3fa5+14925]
+	chromedriver!GetHandleVerifier [0x7ff7e52e4000+14980]
+	chromedriver!(No symbol) [0x7ff7e4e2793d]
+	chromedriver!(No symbol) [0x7ff7e4dfe362]
+	chromedriver!(No symbol) [0x7ff7e4eb1846]
+	chromedriver!(No symbol) [0x7ff7e4ecec82]
+	chromedriver!(No symbol) [0x7ff7e4e7401c]
+	chromedriver!(No symbol) [0x7ff7e4e74f43]
+	chromedriver!GetHandleVerifier [0x7ff7e58c7591+5f7f11]
+	chromedriver!GetHandleVerifier [0x7ff7e58c1902+5f2282]
+	chromedriver!GetHandleVerifier [0x7ff7e58e7115+617a95]
+	chromedriver!GetHandleVerifier [0x7ff7e5301dce+3274e]
+	chromedriver!GetHandleVerifier [0x7ff7e530a82c+3b1ac]
+	chromedriver!GetHandleVerifier [0x7ff7e52ed744+1e0c4]
+	chromedriver!GetHandleVerifier [0x7ff7e52ed8d4+1e254]
+	chromedriver!GetHandleVerifier [0x7ff7e52d1447+1dc7]
+	KERNEL32!BaseThreadInitThunk [0x7ff82857e957+17]
+	ntdll!RtlUserThreadStart [0x7ff829307c1c+2c]
+) | screenshot=ss/12_analytics.png
+[2026-07-07 01:05:26] TEST 13 export                   | http://localhost:3001/dashboard/export | FAIL | Message: no such window: target window already closed (screenshot failed: Message: no such window: target window already closed
+from unknown error: web view not found
+  (Session info: chrome=149.0.7827.201)
+Stacktrace:
+	chromedriver!GetHandleVerifier [0x7ff7e52e3fa5+14925]
+	chromedriver!GetHandleVerifier [0x7ff7e52e4000+14980]
+	chromedriver!(No symbol) [0x7ff7e4e2793d]
+	chromedriver!(No symbol) [0x7ff7e4dfe362]
+	chromedriver!(No symbol) [0x7ff7e4eb1846]
+	chromedriver!(No symbol) [0x7ff7e4ecec82]
+	chromedriver!(No symbol) [0x7ff7e4e7401c]
+	chromedriver!(No symbol) [0x7ff7e4e74f43]
+	chromedriver!GetHandleVerifier [0x7ff7e58c7591+5f7f11]
+	chromedriver!GetHandleVerifier [0x7ff7e58c1902+5f2282]
+	chromedriver!GetHandleVerifier [0x7ff7e58e7115+617a95]
+	chromedriver!GetHandleVerifier [0x7ff7e5301dce+3274e]
+	chromedriver!GetHandleVerifier [0x7ff7e530a82c+3b1ac]
+	chromedriver!GetHandleVerifier [0x7ff7e52ed744+1e0c4]
+	chromedriver!GetHandleVerifier [0x7ff7e52ed8d4+1e254]
+	chromedriver!GetHandleVerifier [0x7ff7e52d1447+1dc7]
+	KERNEL32!BaseThreadInitThunk [0x7ff82857e957+17]
+	ntdll!RtlUserThreadStart [0x7ff829307c1c+2c]
+) | screenshot=ss/13_export.png
+[2026-07-07 01:05:26] TEST 14 account                  | http://localhost:3001/dashboard/account | FAIL | Message: no such window: target window already closed (screenshot failed: Message: no such window: target window already closed
+from unknown error: web view not found
+  (Session info: chrome=149.0.7827.201)
+Stacktrace:
+	chromedriver!GetHandleVerifier [0x7ff7e52e3fa5+14925]
+	chromedriver!GetHandleVerifier [0x7ff7e52e4000+14980]
+	chromedriver!(No symbol) [0x7ff7e4e2793d]
+	chromedriver!(No symbol) [0x7ff7e4dfe362]
+	chromedriver!(No symbol) [0x7ff7e4eb1846]
+	chromedriver!(No symbol) [0x7ff7e4ecec82]
+	chromedriver!(No symbol) [0x7ff7e4e7401c]
+	chromedriver!(No symbol) [0x7ff7e4e74f43]
+	chromedriver!GetHandleVerifier [0x7ff7e58c7591+5f7f11]
+	chromedriver!GetHandleVerifier [0x7ff7e58c1902+5f2282]
+	chromedriver!GetHandleVerifier [0x7ff7e58e7115+617a95]
+	chromedriver!GetHandleVerifier [0x7ff7e5301dce+3274e]
+	chromedriver!GetHandleVerifier [0x7ff7e530a82c+3b1ac]
+	chromedriver!GetHandleVerifier [0x7ff7e52ed744+1e0c4]
+	chromedriver!GetHandleVerifier [0x7ff7e52ed8d4+1e254]
+	chromedriver!GetHandleVerifier [0x7ff7e52d1447+1dc7]
+	KERNEL32!BaseThreadInitThunk [0x7ff82857e957+17]
+	ntdll!RtlUserThreadStart [0x7ff829307c1c+2c]
+) | screenshot=ss/14_account.png
+[2026-07-07 01:05:26] TEST 15 settings                 | http://localhost:3001/dashboard/settings | FAIL | Message: no such window: target window already closed (screenshot failed: Message: no such window: target window already closed
+from unknown error: web view not found
+  (Session info: chrome=149.0.7827.201)
+Stacktrace:
+	chromedriver!GetHandleVerifier [0x7ff7e52e3fa5+14925]
+	chromedriver!GetHandleVerifier [0x7ff7e52e4000+14980]
+	chromedriver!(No symbol) [0x7ff7e4e2793d]
+	chromedriver!(No symbol) [0x7ff7e4dfe362]
+	chromedriver!(No symbol) [0x7ff7e4eb1846]
+	chromedriver!(No symbol) [0x7ff7e4ecec82]
+	chromedriver!(No symbol) [0x7ff7e4e7401c]
+	chromedriver!(No symbol) [0x7ff7e4e74f43]
+	chromedriver!GetHandleVerifier [0x7ff7e58c7591+5f7f11]
+	chromedriver!GetHandleVerifier [0x7ff7e58c1902+5f2282]
+	chromedriver!GetHandleVerifier [0x7ff7e58e7115+617a95]
+	chromedriver!GetHandleVerifier [0x7ff7e5301dce+3274e]
+	chromedriver!GetHandleVerifier [0x7ff7e530a82c+3b1ac]
+	chromedriver!GetHandleVerifier [0x7ff7e52ed744+1e0c4]
+	chromedriver!GetHandleVerifier [0x7ff7e52ed8d4+1e254]
+	chromedriver!GetHandleVerifier [0x7ff7e52d1447+1dc7]
+	KERNEL32!BaseThreadInitThunk [0x7ff82857e957+17]
+	ntdll!RtlUserThreadStart [0x7ff829307c1c+2c]
+) | screenshot=ss/15_settings.png
+[2026-07-07 01:05:26] TEST 16 test-database            | http://localhost:3001/test-database | FAIL | Message: no such window: target window already closed (screenshot failed: Message: no such window: target window already closed
+from unknown error: web view not found
+  (Session info: chrome=149.0.7827.201)
+Stacktrace:
+	chromedriver!GetHandleVerifier [0x7ff7e52e3fa5+14925]
+	chromedriver!GetHandleVerifier [0x7ff7e52e4000+14980]
+	chromedriver!(No symbol) [0x7ff7e4e2793d]
+	chromedriver!(No symbol) [0x7ff7e4dfe362]
+	chromedriver!(No symbol) [0x7ff7e4eb1846]
+	chromedriver!(No symbol) [0x7ff7e4ecec82]
+	chromedriver!(No symbol) [0x7ff7e4e7401c]
+	chromedriver!(No symbol) [0x7ff7e4e74f43]
+	chromedriver!GetHandleVerifier [0x7ff7e58c7591+5f7f11]
+	chromedriver!GetHandleVerifier [0x7ff7e58c1902+5f2282]
+	chromedriver!GetHandleVerifier [0x7ff7e58e7115+617a95]
+	chromedriver!GetHandleVerifier [0x7ff7e5301dce+3274e]
+	chromedriver!GetHandleVerifier [0x7ff7e530a82c+3b1ac]
+	chromedriver!GetHandleVerifier [0x7ff7e52ed744+1e0c4]
+	chromedriver!GetHandleVerifier [0x7ff7e52ed8d4+1e254]
+	chromedriver!GetHandleVerifier [0x7ff7e52d1447+1dc7]
+	KERNEL32!BaseThreadInitThunk [0x7ff82857e957+17]
+	ntdll!RtlUserThreadStart [0x7ff829307c1c+2c]
+) | screenshot=ss/16_test-database.png
+[2026-07-07 01:05:28] Simulation test run finished: 0/16 passed
+[2026-07-07 01:05:28] ====================================================================================================

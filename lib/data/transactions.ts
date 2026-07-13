@@ -1,7 +1,8 @@
-import transactionsData from "@/data/transactions.json"
 import type { EmailTransaction } from "@/lib/types"
 
-export const transactions = transactionsData as EmailTransaction[]
+import { transactions } from "./store"
+
+export { transactions }
 
 export function getTransactionsByCampaign(campaignId: string): EmailTransaction[] {
   return transactions.filter((t) => t.campaign_id === campaignId)

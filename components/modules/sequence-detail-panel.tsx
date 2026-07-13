@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { ExportButton } from "@/components/dashboard/export-button"
 import { SequenceStatsSidebar, SequenceTimeline } from "@/components/modules/sequence-timeline"
 import { useExports } from "@/hooks/use-exports"
+import { useLiveData } from "@/hooks/use-live-data"
 import { buildSequenceDetailExport } from "@/lib/exports/builders"
 import { getSequenceById } from "@/lib/data/sequences"
 import { campaigns } from "@/lib/data/campaigns"
@@ -23,9 +24,17 @@ import {
 export function SequenceDetailPanel({ sequenceId }: { sequenceId: string }) {
   const router = useRouter()
   const { addExport } = useExports()
+  const { ready } = useLiveData()
   const sequence = getSequenceById(sequenceId)
 
   if (!sequence) {
+    if (!ready) {
+      return (
+        <div className="flex flex-col items-center gap-4 py-16">
+          <p className="text-muted-foreground">Loading…</p>
+        </div>
+      )
+    }
     return (
       <div className="flex flex-col items-center gap-4 py-16">
         <p className="text-muted-foreground">Sequence not found</p>

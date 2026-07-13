@@ -10,6 +10,7 @@ import { TransactionStatusBadge } from "@/components/dashboard/status-badge"
 import { audiences } from "@/lib/data/audiences"
 import { campaigns } from "@/lib/data/campaigns"
 import { useExports } from "@/hooks/use-exports"
+import { useLiveData } from "@/hooks/use-live-data"
 import { buildLeadDetailExport } from "@/lib/exports/builders"
 import { getLeadById, getLeadTransactions } from "@/lib/data/leads"
 import { formatDate, formatDateTime } from "@/lib/format"
@@ -40,9 +41,17 @@ import {
 export function LeadDetailPanel({ leadId }: { leadId: string }) {
   const router = useRouter()
   const { addExport } = useExports()
+  const { ready } = useLiveData()
   const lead = getLeadById(leadId)
 
   if (!lead) {
+    if (!ready) {
+      return (
+        <div className="flex flex-col items-center gap-4 py-16">
+          <p className="text-muted-foreground">Loading…</p>
+        </div>
+      )
+    }
     return (
       <div className="flex flex-col items-center gap-4 py-16">
         <p className="text-muted-foreground">Lead not found</p>

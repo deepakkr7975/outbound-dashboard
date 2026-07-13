@@ -48,6 +48,10 @@ function Button({
     <ButtonPrimitive
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
+      // When rendering as a custom element (e.g. a Link/anchor via `render`),
+      // the underlying node isn't a native <button>, so tell Base UI that to
+      // avoid the invalid-button-semantics warning. Callers can still override.
+      nativeButton={props.render ? false : undefined}
       {...props}
     />
   )

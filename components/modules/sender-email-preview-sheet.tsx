@@ -1,6 +1,9 @@
 "use client"
 
-import { LinkedStatusBadge } from "@/components/dashboard/status-badge"
+import {
+  LinkedStatusBadge,
+  VerificationBadge,
+} from "@/components/dashboard/status-badge"
 import { DetailRow } from "@/components/dashboard/detail-row"
 import { PreviewSheetFooter } from "@/components/dashboard/preview-sheet-footer"
 import { campaigns } from "@/lib/data/campaigns"
@@ -49,6 +52,10 @@ export function SenderEmailPreviewSheet({
           <section className="flex flex-col gap-3">
             <h3 className="text-base font-medium">Inbox details</h3>
             <div className="flex flex-col gap-2.5 rounded-xl border p-4">
+              <DetailRow
+                label="Verification"
+                value={<VerificationBadge status={sender.verification_status} />}
+              />
               <DetailRow
                 label="Status"
                 value={<LinkedStatusBadge status={sender.linked_status} />}

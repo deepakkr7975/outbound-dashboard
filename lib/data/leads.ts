@@ -1,8 +1,8 @@
-import leadsData from "@/data/leads.json"
 import type { Lead } from "@/lib/types"
-import { transactions } from "./transactions"
 
-export const leads = leadsData as Lead[]
+import { leads, transactions } from "./store"
+
+export { leads }
 
 export function getLeadsByAudience(audienceId: string): Lead[] {
   return leads.filter((lead) => lead.audience_id === audienceId)

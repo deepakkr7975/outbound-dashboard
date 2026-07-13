@@ -1,7 +1,8 @@
-import audiencesData from "@/data/audiences.json"
 import type { Audience } from "@/lib/types"
 
-export const audiences = audiencesData as Audience[]
+import { audiences } from "./store"
+
+export { audiences }
 
 export function getAudienceById(id: string): Audience | undefined {
   return audiences.find((a) => a.id === id)

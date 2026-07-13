@@ -1,4 +1,4 @@
-import { campaigns, transactions } from "@/lib/data"
+import { transactions } from "@/lib/data"
 
 export interface HeaderEmailStats {
   sent: number
@@ -6,25 +6,15 @@ export interface HeaderEmailStats {
   delivered: number
 }
 
-function getDeliveryRate(): number {
-  const sent = transactions.filter((t) => t.sent_at).length
-  const delivered = transactions.filter((t) => t.delivered_at).length
-  if (sent === 0) return 0.97
-  return delivered / sent
-}
-
+// Derived from actual transactions (the same source the overview cards use) so
+// the header numbers always agree with the rest of the dashboard, rather than
+// mixing campaign counters with an estimated delivery rate.
 export function getHeaderEmailStats(): HeaderEmailStats {
-  const sent = campaigns.reduce((sum, c) => sum + c.sent_count, 0)
-  const scheduled = campaigns
-    .filter((c) => c.status === "sending" || c.status === "scheduled")
-    .reduce((sum, c) => sum + Math.max(0, c.total_count - c.sent_count), 0)
-
-  const deliveryRate = getDeliveryRate()
-  const delivered = campaigns.reduce((sum, c) => {
-    if (c.sent_count === 0) return sum
-    if (c.status === "completed") return sum + c.sent_count
-    return sum + Math.round(c.sent_count * deliveryRate)
-  }, 0)
+  const sent = transactions.filter((t) => t.sent_at).length
+  const scheduled = transactions.filter(
+    (t) => t.status === "queued" && !t.sent_at
+  ).length
+  const delivered = transactions.filter((t) => t.delivered_at).length
 
   return { sent, scheduled, delivered }
 }

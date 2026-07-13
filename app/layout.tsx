@@ -26,9 +26,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    // suppressHydrationWarning: next-themes (dashboard ThemeProvider) mutates
+    // <html> class/style for color-scheme; without this, React warns on hydrate.
     <html
       lang="en"
+      suppressHydrationWarning
       className={cn("dark h-full", "antialiased", geistSans.variable, geistMono.variable, "font-sans", inter.variable)}
+      style={{ colorScheme: "dark" }}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

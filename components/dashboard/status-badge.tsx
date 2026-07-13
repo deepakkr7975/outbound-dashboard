@@ -1,5 +1,10 @@
 import { Badge } from "@/components/ui/badge"
-import type { CampaignStatus, LinkedStatus, TransactionStatus } from "@/lib/types"
+import type {
+  CampaignStatus,
+  LinkedStatus,
+  TransactionStatus,
+  VerificationStatus,
+} from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 const campaignStyles: Record<CampaignStatus, string> = {
@@ -8,6 +13,8 @@ const campaignStyles: Record<CampaignStatus, string> = {
   sending: "bg-primary/15 text-primary border-primary/30",
   completed: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
   paused: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+  cancelled: "bg-destructive/15 text-destructive border-destructive/30",
+  failed: "bg-destructive/15 text-destructive border-destructive/30",
 }
 
 const linkedStyles: Record<LinkedStatus, string> = {
@@ -39,6 +46,22 @@ export function LinkedStatusBadge({ status }: { status: LinkedStatus }) {
   return (
     <Badge variant="outline" className={cn("capitalize", linkedStyles[status])}>
       {status === "free" ? "🟢 Free" : "🔵 Linked"}
+    </Badge>
+  )
+}
+
+const verificationStyles: Record<VerificationStatus, string> = {
+  verified: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  pending_verification: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+}
+
+export function VerificationBadge({ status }: { status: VerificationStatus }) {
+  return (
+    <Badge
+      variant="outline"
+      className={cn(verificationStyles[status])}
+    >
+      {status === "verified" ? "✅ Verified" : "⏳ Not verified"}
     </Badge>
   )
 }

@@ -40,7 +40,7 @@ export function AccountPanel() {
           <CardContent className="flex flex-col gap-6">
             <div className="flex items-center gap-4">
               <Avatar className="size-16 rounded-xl">
-                <AvatarImage src="/avatars/shadcn.jpg" alt={form.name} />
+                <AvatarImage src="/avatars/user.svg" alt={form.name} />
                 <AvatarFallback className="rounded-xl text-lg">AM</AvatarFallback>
               </Avatar>
               <div>

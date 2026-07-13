@@ -1,11 +1,17 @@
 export type LinkedStatus = "free" | "linked"
 
+/** Whether the mailbox has completed the Gmail OAuth connect (can send) or is
+ * still a placeholder created via the manual "Add Email" shortcut. */
+export type VerificationStatus = "verified" | "pending_verification"
+
 export type CampaignStatus =
   | "draft"
   | "scheduled"
   | "sending"
   | "completed"
   | "paused"
+  | "cancelled"
+  | "failed"
 
 export type TransactionStatus =
   | "queued"
@@ -26,6 +32,7 @@ export interface SenderEmail {
   domain: string
   domain_name: string
   signature: string | null
+  verification_status: VerificationStatus
   linked_status: LinkedStatus
   linked_campaign_ids: string[]
   created_at: string
@@ -56,8 +63,18 @@ export interface Lead {
 }
 
 export interface SequenceStepVariant {
+  /**
+   * First subject line — kept for the existing table/detail UI. Derived from
+   * `subject_lines[0]` for AI/new-format sequences, or the legacy `title`.
+   */
   title: string
   body: string
+  /** New backend format: multiple subject-line options (AI A/B). */
+  subject_lines?: string[]
+  /** New backend format: opening hook options rendered before the body. */
+  opening_lines?: string[]
+  /** New backend format: e.g. reply "YES" to book — appended to the email. */
+  reply_trigger?: string | null
 }
 
 export interface SequenceStep {
@@ -75,6 +92,7 @@ export interface Sequence {
   description: string
   total_steps: number
   has_ab_testing: boolean
+  is_ai_generated: boolean
   steps: SequenceStep[]
   is_scheduled: boolean
   is_completed: boolean

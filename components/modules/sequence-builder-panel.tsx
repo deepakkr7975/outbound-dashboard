@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 
 import { SequenceStepEditDialog } from "@/components/modules/sequence-step-edit-dialog"
@@ -9,7 +10,10 @@ import {
   SequenceStatsSidebar,
   SequenceTimeline,
 } from "@/components/modules/sequence-timeline"
+import { useLiveData } from "@/hooks/use-live-data"
+import { createSequence, updateSequence } from "@/lib/api"
 import { getSequenceById } from "@/lib/data/sequences"
+import { refresh } from "@/lib/data/store"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -37,6 +41,8 @@ export function SequenceBuilderPanel({
 }: {
   sequenceId?: string
 }) {
+  const router = useRouter()
+  const { ready, version } = useLiveData()
   const existing = sequenceId ? getSequenceById(sequenceId) : undefined
   const [name, setName] = React.useState(existing?.name ?? "")
   const [description, setDescription] = React.useState(
@@ -48,6 +54,49 @@ export function SequenceBuilderPanel({
   )
   const [editIndex, setEditIndex] = React.useState<number | null>(null)
   const [editOpen, setEditOpen] = React.useState(false)
+  const [saving, setSaving] = React.useState(false)
+
+  // In edit mode the sequence usually arrives after the initial API load —
+  // populate the form once, without clobbering later user edits.
+  const hydratedId = React.useRef<string | null>(existing ? sequenceId ?? null : null)
+  React.useEffect(() => {
+    if (!sequenceId || hydratedId.current === sequenceId) return
+    const seq = getSequenceById(sequenceId)
+    if (seq) {
+      hydratedId.current = sequenceId
+      setName(seq.name)
+      setDescription(seq.description)
+      setHasAb(seq.has_ab_testing)
+      setSteps(seq.steps.length > 0 ? seq.steps : [defaultStep])
+    }
+  }, [sequenceId, version])
+
+  async function handleSave() {
+    if (!name.trim()) {
+      toast.error("Sequence name is required")
+      return
+    }
+    setSaving(true)
+    try {
+      const payload = {
+        name: name.trim(),
+        description,
+        total_steps: steps.length,
+        has_ab_testing: hasAb,
+        steps,
+      }
+      const saved = sequenceId
+        ? await updateSequence(sequenceId, payload)
+        : await createSequence(payload)
+      await refresh()
+      toast.success("Sequence saved")
+      router.push(`/dashboard/sequences/${saved.sequence_id ?? sequenceId}`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Save failed")
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const previewSequence: Sequence = {
     sequence_id: existing?.sequence_id ?? "new",
@@ -55,6 +104,7 @@ export function SequenceBuilderPanel({
     description,
     total_steps: steps.length,
     has_ab_testing: hasAb,
+    is_ai_generated: existing?.is_ai_generated ?? false,
     steps,
     is_scheduled: existing?.is_scheduled ?? false,
     is_completed: existing?.is_completed ?? false,
@@ -115,6 +165,13 @@ export function SequenceBuilderPanel({
   }
 
   if (sequenceId && !existing) {
+    if (!ready) {
+      return (
+        <div className="flex flex-col items-center gap-4 py-16">
+          <p className="text-muted-foreground">Loading…</p>
+        </div>
+      )
+    }
     return (
       <div className="flex flex-col items-center gap-4 py-16">
         <p className="text-muted-foreground">Sequence not found</p>
@@ -156,8 +213,8 @@ export function SequenceBuilderPanel({
           <h2 className="text-xl font-semibold">
             {existing ? "Edit Sequence" : "New Sequence"}
           </h2>
-          <Button onClick={() => toast.success("Sequence saved")}>
-            Save Sequence
+          <Button onClick={handleSave} disabled={saving}>
+            {saving ? "Saving…" : "Save Sequence"}
           </Button>
         </div>
       </div>

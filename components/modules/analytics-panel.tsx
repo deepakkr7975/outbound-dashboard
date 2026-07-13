@@ -42,6 +42,7 @@ import {
 import { campaigns } from "@/lib/data/campaigns"
 import { sequences, getSequenceById } from "@/lib/data/sequences"
 import { useExports } from "@/hooks/use-exports"
+import { useLiveData } from "@/hooks/use-live-data"
 import { useUrlPreview } from "@/hooks/use-url-preview"
 import { buildAnalyticsExport } from "@/lib/exports/builders"
 import { getTransactionById, transactions } from "@/lib/data/transactions"
@@ -69,6 +70,7 @@ export function AnalyticsPanel() {
   const searchParams = useSearchParams()
   const { previewId, setPreviewId } = useUrlPreview()
   const { addExport } = useExports()
+  const { version } = useLiveData()
   const [campaignFilter, setCampaignFilter] = React.useState(
     () => searchParams.get("campaign") ?? "camp_winter"
   )
@@ -90,7 +92,7 @@ export function AnalyticsPanel() {
         setPreviewOpen(true)
       }
     }
-  }, [previewId])
+  }, [previewId, version])
 
   function openPreview(txn: EmailTransaction) {
     setPreviewTxn(txn)
