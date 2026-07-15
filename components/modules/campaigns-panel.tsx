@@ -11,6 +11,14 @@ import { CampaignStatusBadge } from "@/components/dashboard/status-badge"
 import { PageHeader } from "@/components/dashboard/page-header"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +26,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Table,
   TableBody,
@@ -40,7 +58,7 @@ import {
 import { useLiveData } from "@/hooks/use-live-data"
 import { useTableSort } from "@/hooks/use-table-sort"
 import { useUrlPreview } from "@/hooks/use-url-preview"
-import { cancelCampaign, deleteCampaign } from "@/lib/api"
+import { cancelCampaign, createCampaign, deleteCampaign } from "@/lib/api"
 import { refresh } from "@/lib/data/store"
 import { campaigns as initialData } from "@/lib/data/campaigns"
 import { senderEmails } from "@/lib/data/sender-emails"
@@ -91,6 +109,67 @@ export function CampaignsPanel() {
   } = useTableSort<LinkedSortColumn>("campaign")
   const [deleteOpen, setDeleteOpen] = React.useState(false)
   const [selected, setSelected] = React.useState<Campaign | null>(null)
+  const [createOpen, setCreateOpen] = React.useState(false)
+  const [creating, setCreating] = React.useState(false)
+  const emptyCreateForm = {
+    name: "",
+    description: "",
+    sequence_id: "",
+    audience_id: "",
+    sender_email_ids: [] as string[],
+    schedule_at: "",
+  }
+  const [createForm, setCreateForm] = React.useState(emptyCreateForm)
+
+  // Only verified senders can actually send, so those are the eligible picks.
+  const verifiedSenders = senderEmails.filter(
+    (s) => s.verification_status === "verified"
+  )
+
+  const canCreate =
+    !!createForm.name.trim() &&
+    !!createForm.sequence_id &&
+    !!createForm.audience_id &&
+    createForm.sender_email_ids.length > 0 &&
+    !!createForm.schedule_at
+
+  function toggleSender(id: string) {
+    setCreateForm((f) => ({
+      ...f,
+      sender_email_ids: f.sender_email_ids.includes(id)
+        ? f.sender_email_ids.filter((s) => s !== id)
+        : [...f.sender_email_ids, id],
+    }))
+  }
+
+  async function handleCreate() {
+    if (!canCreate) return
+    // The datetime-local value is an IST wall-clock time. Tag it with the fixed
+    // IST offset (+05:30) so the UTC conversion is correct regardless of the
+    // browser's own timezone, then send UTC ISO to the backend.
+    const local = createForm.schedule_at
+    const withSeconds = local.length === 16 ? `${local}:00` : local
+    const scheduleIso = new Date(`${withSeconds}+05:30`).toISOString()
+    setCreating(true)
+    try {
+      await createCampaign({
+        name: createForm.name.trim(),
+        description: createForm.description.trim() || undefined,
+        sender_email_ids: createForm.sender_email_ids,
+        sequence_id: createForm.sequence_id,
+        audience_id: createForm.audience_id,
+        schedule_at: scheduleIso,
+      })
+      await refresh()
+      setCreateOpen(false)
+      setCreateForm(emptyCreateForm)
+      toast.success(`"${createForm.name.trim()}" campaign created`)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Create failed")
+    } finally {
+      setCreating(false)
+    }
+  }
 
   function getSequenceName(id: string) {
     return sequences.find((s) => s.sequence_id === id)?.name ?? id
@@ -376,7 +455,7 @@ export function CampaignsPanel() {
       <PageHeader
         title="Campaigns"
         description="Bind senders, sequences, audiences, and schedules"
-        action={{ label: "New Campaign", onClick: () => toast.info("Campaign wizard coming soon") }}
+        action={{ label: "New Campaign", onClick: () => setCreateOpen(true) }}
       />
       <Tabs defaultValue="campaigns" className="px-4 lg:px-6">
         <TabsList>
@@ -527,6 +606,126 @@ export function CampaignsPanel() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>New Campaign</DialogTitle>
+          </DialogHeader>
+          <div className="grid max-h-[65vh] gap-3 overflow-y-auto px-1">
+            <div className="grid gap-1.5">
+              <Label htmlFor="campaign-name">Name</Label>
+              <Input
+                id="campaign-name"
+                value={createForm.name}
+                onChange={(e) =>
+                  setCreateForm({ ...createForm, name: e.target.value })
+                }
+                placeholder="e.g. Q3 Founders Outreach"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="campaign-description">Description (optional)</Label>
+              <Textarea
+                id="campaign-description"
+                value={createForm.description}
+                onChange={(e) =>
+                  setCreateForm({ ...createForm, description: e.target.value })
+                }
+                placeholder="What is this campaign for?"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="campaign-sequence">Sequence</Label>
+              <Select
+                value={createForm.sequence_id}
+                onValueChange={(v) =>
+                  setCreateForm({ ...createForm, sequence_id: v ?? "" })
+                }
+              >
+                <SelectTrigger id="campaign-sequence" className="w-full">
+                  <SelectValue placeholder="Select a sequence" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sequences.map((s) => (
+                    <SelectItem key={s.sequence_id} value={s.sequence_id}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="campaign-audience">Audience</Label>
+              <Select
+                value={createForm.audience_id}
+                onValueChange={(v) =>
+                  setCreateForm({ ...createForm, audience_id: v ?? "" })
+                }
+              >
+                <SelectTrigger id="campaign-audience" className="w-full">
+                  <SelectValue placeholder="Select an audience" />
+                </SelectTrigger>
+                <SelectContent>
+                  {audiences.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name} · {a.member_count} leads
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Sender Emails</Label>
+              {verifiedSenders.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No verified sender emails available. Verify a sender first.
+                </p>
+              ) : (
+                <div className="grid max-h-40 gap-2 overflow-y-auto rounded-lg border p-3">
+                  {verifiedSenders.map((sender) => (
+                    <label
+                      key={sender.id}
+                      className="flex cursor-pointer items-center gap-2 text-sm"
+                    >
+                      <Checkbox
+                        checked={createForm.sender_email_ids.includes(sender.id)}
+                        onCheckedChange={() => toggleSender(sender.id)}
+                      />
+                      <span>{sender.email}</span>
+                      <span className="text-muted-foreground">
+                        {sender.domain}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="campaign-schedule">Schedule (IST)</Label>
+              <Input
+                id="campaign-schedule"
+                type="datetime-local"
+                value={createForm.schedule_at}
+                onChange={(e) =>
+                  setCreateForm({ ...createForm, schedule_at: e.target.value })
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                Entered in IST (UTC+5:30); converted to UTC before sending.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreate} disabled={!canCreate || creating}>
+              {creating ? "Creating…" : "Create Campaign"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={deleteOpen}

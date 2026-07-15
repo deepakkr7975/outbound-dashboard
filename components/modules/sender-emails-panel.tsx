@@ -75,6 +75,7 @@ function deriveDomainInfo(email: string) {
 
 type SenderSortColumn =
   | "email"
+  | "name"
   | "domain"
   | "domain_name"
   | "verification"
@@ -130,9 +131,17 @@ export function SenderEmailsPanel() {
   const [selected, setSelected] = React.useState<SenderEmail | null>(null)
   const [form, setForm] = React.useState({
     email: "",
+    name: "",
     signature: "",
   })
   const derivedDomain = deriveDomainInfo(form.email)
+  const normalizedEmail = form.email.trim().toLowerCase()
+  // Check both the rendered snapshot and the live store array so a lagging
+  // `data` snapshot can't let a duplicate through.
+  const emailExists = (candidate: string) =>
+    data.some((row) => row.email.trim().toLowerCase() === candidate) ||
+    initialData.some((row) => row.email.trim().toLowerCase() === candidate)
+  const isDuplicate = !!normalizedEmail && emailExists(normalizedEmail)
 
   const domains = Array.from(new Set(data.map((row) => row.domain)))
 
@@ -141,7 +150,8 @@ export function SenderEmailsPanel() {
       const matchesSearch =
         !search ||
         row.email.toLowerCase().includes(search.toLowerCase()) ||
-        row.domain.toLowerCase().includes(search.toLowerCase())
+        row.domain.toLowerCase().includes(search.toLowerCase()) ||
+        (row.name?.toLowerCase().includes(search.toLowerCase()) ?? false)
       const matchesStatus =
         statusFilter === "all" || row.linked_status === statusFilter
       const matchesVerification =
@@ -162,6 +172,7 @@ export function SenderEmailsPanel() {
     }),
     {
       email: (row) => row.email,
+      name: (row) => row.name ?? "",
       domain: (row) => row.domain,
       domain_name: (row) => row.domain_name,
       verification: (row) => (row.verification_status === "verified" ? 1 : 0),
@@ -216,20 +227,27 @@ export function SenderEmailsPanel() {
   }
 
   async function handleAdd() {
-    if (!form.email.includes("@")) {
+    const email = form.email.trim().toLowerCase()
+    if (!email.includes("@")) {
       toast.error("Enter a valid email address")
       return
     }
+    if (emailExists(email)) {
+      toast.error("This email is already added")
+      return
+    }
+    const name = form.name.trim()
     try {
-      const created = await createSenderEmail(form.email)
-      if (form.signature) {
+      const created = await createSenderEmail(email, name)
+      if (form.signature || name) {
         await updateSenderSignature(created.id, {
-          signature_html: form.signature,
+          signature_html: form.signature || undefined,
+          signature_name: name || undefined,
         })
       }
       await refresh()
       setAddOpen(false)
-      setForm({ email: "", signature: "" })
+      setForm({ email: "", name: "", signature: "" })
       toast.success("Sender email added")
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Add failed")
@@ -368,6 +386,14 @@ export function SenderEmailsPanel() {
                   Email
                 </SortableTableHead>
                 <SortableTableHead
+                  column="name"
+                  sortColumn={sortColumn}
+                  sortDirection={sortDirection}
+                  onSort={toggleSort}
+                >
+                  Name
+                </SortableTableHead>
+                <SortableTableHead
                   column="domain"
                   sortColumn={sortColumn}
                   sortDirection={sortDirection}
@@ -434,6 +460,13 @@ export function SenderEmailsPanel() {
                   onClick={() => openPreview(row)}
                 >
                   <TableCell className="font-medium">{row.email}</TableCell>
+                  <TableCell>
+                    {row.name ? (
+                      row.name
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
                   <TableCell>{row.domain}</TableCell>
                   <TableCell>{row.domain_name}</TableCell>
                   <TableCell>
@@ -524,15 +557,33 @@ export function SenderEmailsPanel() {
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 placeholder="outreach@revtrix.in"
               />
-              {derivedDomain && (
-                <p className="text-xs text-muted-foreground">
-                  Domain{" "}
-                  <span className="font-medium text-foreground">
-                    {derivedDomain.domain}
-                  </span>{" "}
-                  · {derivedDomain.domain_name}
+              {isDuplicate ? (
+                <p className="text-xs text-destructive">
+                  This email is already added.
                 </p>
+              ) : (
+                derivedDomain && (
+                  <p className="text-xs text-muted-foreground">
+                    Domain{" "}
+                    <span className="font-medium text-foreground">
+                      {derivedDomain.domain}
+                    </span>{" "}
+                    · {derivedDomain.domain_name}
+                  </p>
+                )
               )}
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="e.g. Ravi Sharma"
+              />
+              <p className="text-xs text-muted-foreground">
+                Shown as the sender name on outgoing emails.
+              </p>
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="sig">Signature (optional)</Label>
@@ -548,7 +599,9 @@ export function SenderEmailsPanel() {
             <Button variant="outline" onClick={() => setAddOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleAdd}>Add Email</Button>
+            <Button onClick={handleAdd} disabled={isDuplicate}>
+              Add Email
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

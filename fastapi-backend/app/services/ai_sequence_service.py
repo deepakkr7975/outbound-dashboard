@@ -158,6 +158,50 @@ A/B testing: {"on" if req.include_ab_testing else "off"}
 Produce exactly {req.num_steps} steps, ordered step_order 1..{req.num_steps}."""
 
 
+def _brief_from_reference(req: GenerateSequenceRequest, reference_text: str) -> str:
+    """
+    Build the user prompt when a reference document drives generation.
+
+    The document is the primary context — the model should mirror its style,
+    structure, and messaging — while the brief fields act only as secondary
+    guidance. Brief fields the caller left blank are omitted so they don't read
+    as empty constraints.
+    """
+    cta = f"{req.cta.text}" + (f" (link: {req.cta.url})" if req.cta.url else "")
+    guidance_lines = []
+    if req.company.strip():
+        guidance_lines.append(f"- Company / website: {req.company.strip()}")
+    if req.target_audience.strip():
+        guidance_lines.append(f"- Target audience: {req.target_audience.strip()}")
+    if req.offer.strip():
+        guidance_lines.append(f"- What we're selling: {req.offer.strip()}")
+    if req.cta.text.strip():
+        guidance_lines.append(f"- Call to action: {cta}")
+    guidance_lines.append(f"- Number of emails: {req.num_steps}")
+    guidance_lines.append(f"- Tone: {req.tone}")
+    guidance_lines.append(f"- A/B testing: {'on' if req.include_ab_testing else 'off'}")
+    guidance = "\n".join(guidance_lines)
+
+    return f"""Below is a REFERENCE DOCUMENT provided by the user. Study its style, \
+structure, tone, and messaging, then write a NEW cold-email sequence that follows \
+the same approach.
+
+=== REFERENCE DOCUMENT START ===
+{reference_text}
+=== REFERENCE DOCUMENT END ===
+
+Instructions:
+- Mirror the reference's voice, structure, cadence, and persuasion style.
+- Do NOT copy the reference verbatim. Produce fresh, original copy inspired by it.
+- If the reference implies a company, audience, or offer, carry those through \
+unless the settings below override them.
+
+Additional settings (secondary guidance — the reference document takes priority):
+{guidance}
+
+Produce exactly {req.num_steps} steps, ordered step_order 1..{req.num_steps}."""
+
+
 # ── Post-processing ──────────────────────────────────────────────────────────
 
 def _truncate_body(body: str, limit: int) -> str:
@@ -259,15 +303,31 @@ def _generate(system: str, user: str) -> _AISequence:
 
 # ── Public API ───────────────────────────────────────────────────────────────
 
-def generate_sequence(req: GenerateSequenceRequest) -> Sequence:
-    """Brief -> a fully-formed (unsaved) Sequence draft."""
+def generate_sequence(
+    req: GenerateSequenceRequest,
+    reference_text: Optional[str] = None,
+) -> Sequence:
+    """
+    Brief -> a fully-formed (unsaved) Sequence draft.
+
+    When `reference_text` is supplied (extracted from an uploaded document), the
+    document drives the copy and the brief fields become secondary guidance.
+    Without it, behaviour is unchanged. Both paths share the same system prompt,
+    structured-output call, and assembly, so the response shape is identical.
+    """
+    user = (
+        _brief_from_reference(req, reference_text)
+        if reference_text
+        else _brief(req)
+    )
     ai = _generate(
         _system_prompt(req.body_char_limit, req.personalization_vars, req.include_ab_testing, req.tone),
-        _brief(req),
+        user,
     )
     steps = _assemble_steps(ai.steps, req.body_char_limit, req.include_ab_testing)
+    default_name = f"{req.company} sequence" if req.company.strip() else "Generated sequence"
     return Sequence(
-        name=ai.name.strip() or f"{req.company} sequence",
+        name=ai.name.strip() or default_name,
         description=ai.description.strip() or None,
         total_steps=len(steps),
         has_ab_testing=req.include_ab_testing,

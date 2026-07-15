@@ -29,6 +29,7 @@ export type ABVariant = "A" | "B"
 export interface SenderEmail {
   id: string
   email: string
+  name: string | null
   domain: string
   domain_name: string
   signature: string | null

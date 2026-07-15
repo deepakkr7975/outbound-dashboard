@@ -31,10 +31,14 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import {
   AiMagicIcon,
   ArrowLeft01Icon,
+  Cancel01Icon,
+  File01Icon,
   FloppyDiskIcon,
   RefreshIcon,
   SparklesIcon,
 } from "@hugeicons/core-free-icons"
+
+const FILE_ACCEPT = ".pdf,.doc,.docx,.txt,.md"
 
 const TONES: { value: SequenceTone; label: string }[] = [
   { value: "professional", label: "Professional" },
@@ -65,6 +69,12 @@ export function AiSequencePanel() {
   const [includeAb, setIncludeAb] = React.useState(false)
   const [personalization, setPersonalization] = React.useState("name, company")
 
+  // ── Optional reference file ────────────────────────────────────────────
+  // When present, the AI reads this document and mimics it instead of relying
+  // on the brief. Absent, generation falls back to the structured brief.
+  const [file, setFile] = React.useState<File | null>(null)
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
+
   // ── Draft + refine ─────────────────────────────────────────────────────
   const [draft, setDraft] = React.useState<SequenceDraft | null>(null)
   const [instruction, setInstruction] = React.useState("")
@@ -88,18 +98,31 @@ export function AiSequencePanel() {
     }
   }
 
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setFile(e.target.files?.[0] ?? null)
+  }
+
+  function clearFile() {
+    setFile(null)
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
   async function handleGenerate() {
-    if (!company.trim() || !targetAudience.trim() || !offer.trim()) {
-      toast.error("Company, target audience, and offer are required")
-      return
-    }
-    if (!ctaText.trim()) {
-      toast.error("A call-to-action is required")
-      return
+    // A reference file drives generation on its own, so the brief fields are
+    // only required when no file is attached.
+    if (!file) {
+      if (!company.trim() || !targetAudience.trim() || !offer.trim()) {
+        toast.error("Company, target audience, and offer are required")
+        return
+      }
+      if (!ctaText.trim()) {
+        toast.error("A call-to-action is required")
+        return
+      }
     }
     setGenerating(true)
     try {
-      const result = await generateAiSequence(buildBrief())
+      const result = await generateAiSequence(buildBrief(), file)
       setDraft(result)
       setInstruction("")
       toast.success("Draft generated — review, refine, then save")
@@ -304,6 +327,52 @@ export function AiSequencePanel() {
                 A/B testing {includeAb ? "on" : "off"}
               </Button>
             </div>
+
+            <div className="grid gap-1.5">
+              <Label htmlFor="ai-file">Reference file (optional)</Label>
+              <input
+                ref={fileInputRef}
+                id="ai-file"
+                type="file"
+                accept={FILE_ACCEPT}
+                onChange={handleFileChange}
+                className="hidden"
+              />
+              {file ? (
+                <div className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
+                  <HugeiconsIcon
+                    icon={File01Icon}
+                    strokeWidth={2}
+                    className="size-4 shrink-0 text-muted-foreground"
+                  />
+                  <span className="truncate">{file.name}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    type="button"
+                    className="ml-auto shrink-0"
+                    onClick={clearFile}
+                    aria-label="Remove file"
+                  >
+                    <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <HugeiconsIcon icon={File01Icon} strokeWidth={2} />
+                  Upload a file to mimic
+                </Button>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Upload a PDF or doc to generate from it. Leave empty to use the
+                brief above.
+              </p>
+            </div>
+
             <Button onClick={handleGenerate} disabled={busy}>
               <HugeiconsIcon icon={SparklesIcon} strokeWidth={2} />
               {generating ? "Generating…" : draft ? "Regenerate" : "Generate draft"}

@@ -205,6 +205,7 @@ export function mapSenderEmail(raw: RawAccount): SenderEmail {
   return {
     id: raw.id,
     email: raw.email,
+    name: raw.signature_name,
     domain: raw.domain ?? raw.email.split("@")[1] ?? "",
     domain_name: raw.domain_name ?? "",
     signature: raw.signature_html,
@@ -488,10 +489,10 @@ export function connectSenderEmail() {
   return api<{ authorization_url: string }>("/email-accounts/connect")
 }
 
-export function createSenderEmail(email: string) {
+export function createSenderEmail(email: string, name?: string) {
   return api<{ id: string; email: string }>("/email-accounts", {
     method: "POST",
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ email, signature_name: name || undefined }),
   })
 }
 
@@ -503,7 +504,7 @@ export function deleteSenderEmail(id: string) {
 
 export function updateSenderSignature(
   id: string,
-  body: { signature_html?: string }
+  body: { signature_html?: string; signature_name?: string }
 ) {
   return api<{ message: string }>(`/email-accounts/${id}/signature`, {
     method: "PATCH",
@@ -559,13 +560,30 @@ export interface RefineSequenceBody {
 /** A draft sequence carries the same shape as a saved one, un-persisted. */
 export type SequenceDraft = Sequence & { draft?: boolean }
 
-/** Generate a sequence draft from a brief. Does NOT persist. */
+/**
+ * Generate a sequence draft from a brief. Does NOT persist.
+ *
+ * When `file` is supplied, the request is sent as multipart/form-data so the
+ * backend can read the document (e.g. an existing sequence to mimic): the file
+ * goes in the `file` field and the brief is JSON-encoded in the `brief` field.
+ * Without a file it falls back to the plain JSON brief request.
+ */
 export async function generateAiSequence(
-  body: GenerateSequenceBody
+  body: GenerateSequenceBody,
+  file?: File | null
 ): Promise<SequenceDraft> {
+  let init: RequestInit
+  if (file) {
+    const form = new FormData()
+    form.append("file", file)
+    form.append("brief", JSON.stringify(body))
+    init = { method: "POST", body: form }
+  } else {
+    init = { method: "POST", body: JSON.stringify(body) }
+  }
   const raw = await api<RawSequence & { draft?: boolean }>(
     "/ai/sequences/generate",
-    { method: "POST", body: JSON.stringify(body) }
+    init
   )
   return { ...mapSequence(raw), draft: Boolean(raw.draft) }
 }
