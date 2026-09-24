@@ -1,4 +1,4 @@
-# 🚀 Outbound Dashboard (Kallix)
+#  Outbound Dashboard
 
 [![Next.js](https://img.shields.io/badge/Next.js-16.2-black?style=flat&logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19.2-blue?style=flat&logo=react)](https://react.dev/)
@@ -14,7 +14,7 @@ An enterprise-ready, full-stack cold email outreach and automated campaign platf
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 | **Dashboard Overview & Metrics** | **Audience & Lead Management** |
 |:---:|:---:|
@@ -26,7 +26,7 @@ An enterprise-ready, full-stack cold email outreach and automated campaign platf
 
 ---
 
-## 📑 Table of Contents
+##  Table of Contents
 
 - [Key Features](#-key-features)
 - [System Architecture](#-system-architecture)
@@ -48,41 +48,41 @@ An enterprise-ready, full-stack cold email outreach and automated campaign platf
 
 ---
 
-## ✨ Key Features
+##  Key Features
 
-### 📬 1. Multi-Sender Inbox Rotation & Warmup Safeguards
+###  1. Multi-Sender Inbox Rotation & Warmup Safeguards
 - **Native Gmail Integration**: Seamless OAuth 2.0 connection to link Google Workspace and Gmail accounts securely.
 - **Round-Robin Sender Rotation**: Distribute outbound volume evenly across multiple linked mailboxes to protect sender reputation and avoid spam filters.
 - **Inbox Linked Status**: Visual indicators distinguishing `free` inboxes from those actively `linked` to live campaigns.
 - **Daily Quotas & Counters**: Enforces daily send limits per inbox with automatic midnight counter resets.
 - **Dynamic Signature Management**: Built-in rich HTML editor supporting personalized tokens (`{first_name}`, `{company}`, `{role}`, `{city}`).
 
-### 👥 2. Audiences & Lead Management
+###  2. Audiences & Lead Management
 - **Smart CSV Ingestion**: Upload lead spreadsheets with interactive column mapping (`email`, `name`, `role`, `company`, `city`).
 - **Automatic Deduplication**: Prevent duplicate outreach by automatically deduplicating leads within audiences.
 - **Tagging & Segmentation**: Categorize leads into targeted segments using custom tags.
 - **Contact History**: Real-time status indicators tracking whether a lead has been contacted and which campaign step they are currently on.
 
-### ⚡ 3. Sequences & Drag-and-Drop Workflow Builder
+###  3. Sequences & Drag-and-Drop Workflow Builder
 - **Visual Step Builder**: Reorder outreach steps dynamically using `@dnd-kit` drag-and-drop.
 - **Cadence & Wait Days**: Configure customizable delay periods (`wait_days`) between sequence steps (e.g., Step 1: Immediate, Step 2: +3 days, Step 3: +4 days).
 - **Template Variables**: Dynamically render recipient attributes directly in subject lines and email bodies.
 
-### 🧪 4. Built-In A/B Split Testing
+###  4. Built-In A/B Split Testing
 - **Multi-Variant Subject Lines & Bodies**: Define Variant A and Variant B for any step to test hooks, calls-to-action, or entire email bodies.
 - **Granular Conversion Split**: Compare open, click, and reply rates across variants to double down on winning copy.
 
-### 🤖 5. AI Sequence Generation (Google Gemini 2.5)
+###  5. AI Sequence Generation (Google Gemini 2.5)
 - **Prompt-to-Sequence Generation**: Describe your target persona, product value proposition, and tone to generate complete multi-step sequences in seconds.
 - **Knowledge Upload (PDF / DOCX)**: Upload case studies, whitepapers, or marketing collateral to train the AI copy generator on your product context.
 - **Smart Refinement**: Regenerate individual steps, rewrite opening hooks, or request tone adjustments directly from the UI.
 
-### 🚀 6. Campaign Orchestration
+###  6. Campaign Orchestration
 - **5-Step Launch Wizard**: Step-by-step campaign creation (Details ➔ Select Senders ➔ Attach Sequence ➔ Target Audience ➔ Schedule).
 - **Timezone-Aware Delivery**: Schedule campaigns to initiate outreach at optimal recipient local times.
 - **Full Lifecycle Management**: Draft, schedule, run, pause, resume, or cancel campaigns on demand.
 
-### 📈 7. Granular Event Tracking & Funnel Analytics
+###  7. Granular Event Tracking & Funnel Analytics
 - **ULID-Indexed Transactions**: Every dispatch is tracked at the individual recipient-step level.
 - **Open Tracking**: Invisible 1x1 transparent tracking pixel (`/o/{token}`) with bot-filter heuristics.
 - **Click Tracking**: High-speed redirect engine (`/c/{token}/{idx}`) recording link interactions.
@@ -90,12 +90,12 @@ An enterprise-ready, full-stack cold email outreach and automated campaign platf
 - **Interactive Visualizations**: Conversion funnels, status distributions, and timeline charts powered by Recharts.
 - **CSV Data Export**: Export transactional records and metrics for offline analysis.
 
-### 🛠 8. Live Database Inspector
+###  8. Live Database Inspector
 - **In-App DynamoDB Viewer**: Built-in `/test-database` inspector allowing developers to query and inspect all underlying DynamoDB tables with automatic credential redaction.
 
 ---
 
-## 🏗 System Architecture
+##  System Architecture
 
 ```mermaid
 flowchart TD
@@ -145,7 +145,7 @@ flowchart TD
 
 ---
 
-## 💻 Tech Stack
+##  Tech Stack
 
 | Domain | Technology | Description |
 |---|---|---|
@@ -163,7 +163,7 @@ flowchart TD
 
 ---
 
-## 🗄 Database Schema (DynamoDB)
+##  Database Schema (DynamoDB)
 
 The platform utilizes a structured DynamoDB architecture designed for high write throughput and zero-collision tracking:
 
@@ -180,7 +180,7 @@ The platform utilizes a structured DynamoDB architecture designed for high write
 
 ---
 
-## 📁 Project Directory Structure
+##  Project Directory Structure
 
 ```text
 outbound-dashboard/
@@ -230,7 +230,7 @@ outbound-dashboard/
 
 ---
 
-## 🚀 Getting Started
+##  Getting Started
 
 ### Prerequisites
 
@@ -308,7 +308,7 @@ Ensure you have the following installed on your local environment:
 
 ---
 
-## 🔑 Google Cloud OAuth 2.0 Configuration
+##  Google Cloud OAuth 2.0 Configuration
 
 To allow Outbound Dashboard to send cold emails via Gmail accounts:
 
@@ -333,7 +333,7 @@ To allow Outbound Dashboard to send cold emails via Gmail accounts:
 
 ---
 
-## ⚙️ Environment Variables
+##  Environment Variables
 
 ### Backend (`fastapi-backend/.env`)
 
@@ -360,7 +360,7 @@ To allow Outbound Dashboard to send cold emails via Gmail accounts:
 
 ---
 
-## 📡 API Reference
+##  API Reference
 
 Interactive OpenAPI documentation is generated live at `http://127.0.0.1:8000/docs`. Key routes include:
 
@@ -386,7 +386,7 @@ Interactive OpenAPI documentation is generated live at `http://127.0.0.1:8000/do
 
 ---
 
-## ☁️ Deployment
+##  Deployment
 
 ### Backend on Modal (Serverless)
 
@@ -429,7 +429,7 @@ The backend includes a native [`modal_app.py`](fastapi-backend/modal_app.py) con
 
 ---
 
-## 🧪 End-to-End Simulation & Testing
+##  End-to-End Simulation & Testing
 
 The repository includes a simulation suite located in [`simulate-test/`](simulate-test/):
 
@@ -442,6 +442,6 @@ This validates API health, database connections, lead imports, sequence creation
 
 ---
 
-## 📄 License
+##  License
 
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
