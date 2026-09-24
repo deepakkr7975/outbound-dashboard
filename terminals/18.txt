@@ -1,7 +1,0 @@
----
-pid: 22012
-cwd: "C:\Users\itswa\Downloads\outbound-dashboard"
-command: "powershell -Command \"Start-Sleep -Seconds 20\""
-started_at: 2026-07-03T21:12:30.529Z
-running_for_ms: 6720011  
----
